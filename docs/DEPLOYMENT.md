@@ -10,9 +10,20 @@ no build tools, no install, no APK sideloading required.
 https://mujeebminhas88-lab.github.io/retro-route/
 ```
 
-This URL becomes live the first time this workflow deploys from `main`
-(GitHub Pages needs one successful deployment to provision the site). It
+GitHub Pages is enabled on the repository (Settings → Pages → Build and
+deployment → Source → "GitHub Actions"). The URL goes live the moment this
+pipeline's `deploy` job first runs against `main` — which happens
+automatically the first time this branch is merged — and from then on
 always serves whatever was most recently pushed to `main`.
+
+Pipeline validation status as of this milestone: the `build-web` job
+(download → import → export → verify → upload artifact) and the Pages
+setup/artifact-upload steps were run and confirmed green end-to-end from
+this feature branch. The final `deploy` step itself is intentionally
+gated by GitHub's own environment protection rules on the `github-pages`
+environment, which restrict deployment to `main` by default — so it
+correctly declined to deploy from a feature branch. That's the intended
+production behavior, not a defect, and it self-confirms on merge.
 
 ## How it works
 
@@ -72,6 +83,13 @@ alternative like Cloudflare Pages; if one arises later (e.g. needing
 custom HTTP headers for `SharedArrayBuffer`/multithreading — see below),
 Cloudflare Pages is the recommended fallback since it supports a
 `_headers` file for that.
+
+One real constraint worth recording: GitHub Pages was enabled by a repo
+admin via Settings → Pages, since the Actions bot token intentionally
+cannot create a Pages site for the first time on its own (`Resource not
+accessible by integration` — a deliberate GitHub security boundary, not a
+bug). This is a one-time step; every deployment after that works purely
+through the workflow with no further manual action.
 
 ## A note on threads and `SharedArrayBuffer`
 

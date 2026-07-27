@@ -6,7 +6,7 @@ name: Build and Deploy Web
 # so a broken export can never reach main.
 on:
   push:
-    branches: [main, claude/retro-route-3d-audit-5nnufy] # TEMP: validating pipeline pre-merge, will revert to [main] only
+    branches: [main]
     paths:
       - "game/**"
       - ".github/workflows/deploy-web.yml"

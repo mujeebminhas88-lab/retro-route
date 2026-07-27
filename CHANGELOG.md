@@ -11,7 +11,8 @@ All notable changes to Retro Route will be documented in this file.
 - Godot editor + Web export templates are downloaded with pinned versions and SHA-512 checksum verification, and cached between CI runs.
 - Added `docs/DEPLOYMENT.md` documenting the pipeline, the GitHub Pages choice (and the Cloudflare Pages fallback if custom headers are ever needed for threading), how to trigger deployments, and how to reproduce the build locally.
 - Verified locally end-to-end: downloaded Godot 4.3 editor + Web export templates, ran the exact import/export commands the CI workflow runs, and confirmed the exported build boots and renders (WebGL2, no console/page errors) in both a desktop viewport and an emulated mobile viewport (Pixel 7) via headless Chromium, with a rendered screenshot confirming the ground/cube/house scene displays correctly.
-- Live URL (activates on first deploy from `main`): `https://mujeebminhas88-lab.github.io/retro-route/`
+- Verified in CI on this branch (via temporary manual dispatch, since branch-only runs otherwise can't test a `main`-gated deploy step): the full `build-web` job (checksum-verified download, import, export, output verification, artifact upload) and Pages setup/artifact-upload steps ran green. GitHub Pages was enabled on the repo (a one-time admin action the Actions token intentionally can't do itself). The final `deploy` step correctly declined to run from a non-`main` branch due to GitHub's own `github-pages` environment protection rules — the intended production behavior. It will run automatically on the next push to `main`.
+- Live URL (activates on the first deploy from `main`, i.e. once this branch is merged): `https://mujeebminhas88-lab.github.io/retro-route/`
 
 ### Milestone: Project Foundation
 

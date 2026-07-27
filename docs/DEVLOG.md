@@ -146,11 +146,16 @@ Godot itself is not installed in the development container by default; a Godot 4
 
 ### Notes
 
-This milestone deliberately stayed off `main` — the workflow is written to deploy from `main`, but was validated via manual `workflow_dispatch` runs from this feature branch first, since GitHub Pages deployment via `actions/deploy-pages` works regardless of which branch triggers the run (Pages config is a repo-level setting, not branch-specific). Once this branch is approved and merged, every future push to `main` deploys automatically with no further setup.
+This milestone deliberately stayed off `main`. To validate the pipeline before merge, the push trigger was temporarily widened to include this feature branch, run, then reverted — the workflow's final, committed state only triggers deploys from `main` (plus manual dispatch), exactly as required.
+
+Two real issues surfaced and were resolved during validation:
+
+1. GitHub Pages had never been enabled for this repo. The Actions bot token cannot create a Pages site on its own (`Resource not accessible by integration` — a deliberate GitHub security boundary), so a repo admin enabled it once via Settings → Pages → Build and deployment → Source → "GitHub Actions". Every deployment after that needs no further manual action.
+2. Once Pages was enabled, `build-web` and the Pages setup/artifact-upload steps ran fully green from this branch — but the final `deploy` step correctly declined to run, because GitHub's own `github-pages` environment protection rules restrict deployment to `main` by default. That's the correct production behavior, not a bug, and it will fire automatically the moment this branch is merged.
 
 ### Next Session
 
-- Merge this branch into `main` (after approval) and confirm the first automatic `main`-triggered deployment goes green.
+- Merge this branch into `main` (after approval) and confirm the first automatic `main`-triggered deployment goes green, producing the live URL.
 - Build the real player/bike controller and hook it into `scenes/player/`.
 - Build a proper chase/follow camera rig.
 

@@ -4,7 +4,18 @@ All notable changes to Retro Route will be documented in this file.
 
 ## [Unreleased]
 
-Nothing yet — development for the next milestone happens on its own feature branch and lands here once merged.
+### Milestone: The BMX Begins (First Arcade BMX Prototype)
+
+- Replaced the walk/run locomotion in `game/scripts/player/player.gd` with arcade BMX vehicle controls: forward/back is throttle/brake, left/right steers the bike. No wheel colliders, no suspension, no gear shifting, no manual balancing — tuned purely for immediate, responsive, Paperboy-style fun, not simulation.
+- Every tuning value is an exported `@export` parameter, per the milestone requirement: `top_speed`, `reverse_speed_ratio`, `acceleration`, `braking`, `steering_sensitivity`, `turning_radius`, `min_turn_speed`, plus optional visual-feel knobs `lean_angle_max_degrees`, `pitch_angle_max_degrees`, `lean_response`, `wheel_spin_rate`.
+- The player now spawns already mounted on the bike — there's no separate "get on the BMX" step or state; BMX riding *is* the game's only locomotion mode.
+- Steering angular velocity scales with current speed (`(speed / turning_radius) * steering_sensitivity`, floored by `min_turn_speed` so a light throttle still lets the bike pivot instead of feeling stuck) — the closest arcade approximation of "you can't turn sharply at a standstill" without any real bicycle physics.
+- Added subtle, tunable visual polish — speed-scaled lean into turns, a small forward/back pitch under acceleration/braking, and spinning wheels — applied to a new `LeanPivot` child node instead of `VisualRoot` itself, so it can never corrupt the `VisualRoot.global_transform.basis.z` facing vector that `FollowCamera` and `Thrower` both depend on (the same transform-isolation lesson learned from Milestone 4's squash-stretch bug).
+- Rebuilt `game/scenes/player/Player.tscn`: the placeholder character now sits atop simple primitive BMX geometry (two spinning wheels, a frame, a handlebar — `TorusMesh`/`BoxMesh`, matching the existing low-poly placeholder art style). Collision stays the existing capsule; no new colliders were added.
+- Reused the existing chase camera and gravity/jump/landing state machine entirely unchanged — only the horizontal movement model changed.
+- Removed `PlayerInput.get_speed_scale()` (the walk/run blend helper), which became dead code once BMX throttle replaced the walk/run speed lerp.
+- A real steering bug was found and fixed during testing: the initial implementation turned the bike *left* when steering right (and vice versa). Caught by comparing the new steering math against the sign convention `Basis.looking_at()` uses (and the pre-BMX locomotion relied on) for "facing +X is a negative `rotation.y`" — confirmed with a live browser session before the fix (bike visibly turned the wrong way) and after (correct).
+- Verified extensively: a headless scripted test drives the real `Playground` scene end-to-end — accelerates to top speed, brakes back to a stop, confirms steering turns the bike, then rides toward the active mailbox and throws while still moving, asserting the score lands on exactly 10. In the real exported Web build, closed-loop pursuit sessions (reading live player/target position through a temporary debug bridge, removed before commit) delivered successfully with both genuine keyboard input and genuine synthetic touch events, both reaching **Score: 10** with **zero console/page errors**.
 
 ## [v0.1.0-alpha] - 2026-07-27
 

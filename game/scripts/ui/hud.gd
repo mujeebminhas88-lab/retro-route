@@ -7,6 +7,13 @@ extends CanvasLayer
 
 @export var delivery_manager_path: NodePath
 
+@export_group("Celebration")
+@export var celebration_overshoot_scale: float = 1.1
+@export var celebration_overshoot_duration: float = 0.15
+@export var celebration_settle_duration: float = 0.1
+@export var celebration_hold_duration: float = 0.6
+@export var celebration_fade_duration: float = 0.4
+
 @onready var score_label: Label = $ScoreLabel
 @onready var complete_label: Label = $DeliveryCompleteLabel
 
@@ -35,7 +42,7 @@ func _on_delivery_succeeded(_mailbox: Node3D) -> void:
 	complete_label.modulate.a = 1.0
 
 	_complete_tween = create_tween()
-	_complete_tween.tween_property(complete_label, "scale", Vector2(1.1, 1.1), 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_complete_tween.tween_property(complete_label, "scale", Vector2(1.0, 1.0), 0.1)
-	_complete_tween.tween_interval(0.6)
-	_complete_tween.tween_property(complete_label, "modulate:a", 0.0, 0.4)
+	_complete_tween.tween_property(complete_label, "scale", Vector2.ONE * celebration_overshoot_scale, celebration_overshoot_duration).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_complete_tween.tween_property(complete_label, "scale", Vector2.ONE, celebration_settle_duration)
+	_complete_tween.tween_interval(celebration_hold_duration)
+	_complete_tween.tween_property(complete_label, "modulate:a", 0.0, celebration_fade_duration)

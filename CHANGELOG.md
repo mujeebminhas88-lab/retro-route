@@ -4,6 +4,40 @@ All notable changes to Retro Route will be documented in this file.
 
 ## [Unreleased]
 
+### Milestone: Game Feel
+
+Not a gameplay milestone — no new mechanics. Every change here is tuning, feedback, or polish on the existing ride/throw/deliver loop, and every tunable introduced is an `@export` (nothing hard-coded).
+
+**Bike feel** (`game/scripts/player/player.gd`)
+- Steering input is now smoothed (`steering_input_smoothing`) before driving turn rate or lean, so digital keyboard/touch input reads less twitchy without losing responsiveness.
+- Cornering now bleeds a small, purely cosmetic amount of speed proportional to steering angle and current speed (`cornering_speed_loss`) — arcade weight in corners without real tire friction or fighting the player's input.
+- Braking now visibly dives the bike's nose (`brake_dive_extra_degrees`), computed from the same accelerate/brake rate-selection logic already driving the throttle model, layered onto the existing speed-based pitch.
+- Added a continuous, speed-scaled suspension bounce plus a landing compression (`suspension_bounce_amount/frequency`, `suspension_landing_compress`, `suspension_response`) — cheap per-frame sine + exponential decay applied to `LeanPivot.position.y`, no tweens or allocations, purely cosmetic (never touches the collision body).
+- Every landing now gets a small suspension "give" regardless of fall speed; a hard landing additionally still triggers the existing squash-stretch, plus a new one-shot dust puff and a landing thump sound.
+- Added a continuous ride audio hum whose volume and pitch track current speed (silent at a stop, fading in with throttle).
+
+**Camera feel** (`game/scripts/camera/follow_camera.gd`)
+- Anticipation: the camera's target position leads slightly in the direction of travel, scaled by speed (`anticipation_strength`).
+- Dynamic speed zoom: follow distance grows slightly at higher speed (`speed_zoom_distance`) for a sense of speed, and settles back at low speed.
+- Turn tilt: a very subtle camera roll while turning, derived from the target's own yaw rate rather than reaching into Player's internals (`turn_tilt_max_degrees`) — keeps the camera rig decoupled from Player's specific implementation.
+- Landing impulse: a brief camera dip on hard landings, driven by the existing `Player.landed` signal (`landing_impulse_strength`) — the camera connects to it directly rather than polling.
+
+**Throw feel** (`game/scripts/gameplay/thrower.gd`, `newspaper.gd`, `mailbox.gd`, `effects/squash_stretch.gd`)
+- Throwing now has a brief windup (`throw_windup_time`): pressing throw plays an immediate anticipation squash, then the newspaper actually launches (and the whoosh plays) a beat later, giving the action real weight instead of an instant snap.
+- `SquashStretch`'s jump-feedback values were hard-coded literals before this milestone; they're now exported (`jump_squash_scale/duration/recover_duration`) alongside a new `play_throw_feedback()` with its own tunables.
+- The newspaper's arc gets a gentle apex-synced scale pulse (`apex_stretch_amount`) instead of a directional stretch (which would fight its continuous spin) — makes the hardest-to-judge moment of the arc a touch more readable.
+- A successful delivery now pops the newspaper briefly before it disappears (`impact_pop_scale/duration`) instead of vanishing instantly.
+- Mailboxes now physically wobble on delivery (`wobble_angle_degrees/frequency/duration`), layered on top of the existing squash-stretch and particle burst — implemented as a simple decaying sine on `rotation.z`, no extra Tween allocation.
+
+**Visual/audio juice**
+- `FloatingPopup` (the "+10" score popup) now punches in with a quick overshoot-scale before its existing rise/fade (`punch_scale/duration`); its rise/fade timing is also now exported instead of hard-coded.
+- `HUD`'s "Delivery Complete!" celebration tween had its scale-overshoot/hold/fade values hard-coded before this milestone; they're now exported (`celebration_*`).
+- The delivery chime gets a small random pitch variance per delivery (`delivery_sound_pitch_variance`) so repeated deliveries don't sound identical.
+- Added three new procedurally-generated placeholder sounds (matching the existing delivery-chime technique — synthesized at build time, no external assets): a throw whoosh, a landing thump, and a seamlessly-looping ride hum (built from sine partials at exact integer multiples of 1/duration so the loop has zero click at the seam).
+- `DustEmitter`'s script now also backs a one-shot "landing puff" node (`burst()` method) alongside its original continuous role, reusing the same material/mesh setup rather than introducing a second particle script.
+
+**Testing**: a headless scripted test drives the real `Playground` scene — confirms acceleration, the suspension bounce producing a nonzero offset, lean reacting to cornering, brake dive changing pitch, and a full ride-throw-deliver cycle (now including the throw windup) still scoring correctly. In the real exported Web build, both a genuine keyboard session and a genuine synthetic-touch session delivered successfully (Score: 10) with zero console errors; draw calls were sampled at multiple points (46-459, spawn included) confirming the swing is entirely about how much of the long, unobstructed straight street is in the camera's frustum at a given moment (an M7 layout characteristic), not a new cost introduced this milestone — the only new draw call is the one-shot landing dust node.
+
 ### Milestone: The First Neighborhood
 
 - Replaced the prototype test playground (a single placeholder house and a stray cube) with the first real suburban neighborhood: a straight two-sided street with sidewalks, curbs, driveways, dashed road markings, 6 houses (3 per side, each with its own mailbox, a driveway, and a bush), trees, streetlights, telephone poles, fire hydrants, a bench, trash bins, and picket fences around two front yards. This is a level-design milestone, not an art milestone — everything favors clear shapes, strong silhouettes, and bright flat colors that read at a glance from the gameplay camera, per the design brief.

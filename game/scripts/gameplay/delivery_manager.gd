@@ -11,6 +11,7 @@ signal delivery_succeeded(mailbox: Node3D)
 signal delivery_missed
 
 @export var points_per_delivery: int = 10
+@export var delivery_sound_pitch_variance: float = 0.06
 
 const FLOATING_POPUP_SCENE := preload("res://scenes/ui/FloatingPopup.tscn")
 
@@ -69,6 +70,7 @@ func _spawn_score_popup(mailbox: Node3D) -> void:
 func _play_delivery_sound(mailbox: Node3D) -> void:
 	if _sfx_player:
 		_sfx_player.global_position = mailbox.global_position
+		_sfx_player.pitch_scale = 1.0 + randf_range(-delivery_sound_pitch_variance, delivery_sound_pitch_variance)
 		_sfx_player.play()
 
 

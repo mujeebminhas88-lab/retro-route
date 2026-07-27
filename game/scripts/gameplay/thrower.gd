@@ -6,21 +6,44 @@ extends Node
 ## mailbox); adding manual aim later only means changing how the target
 ## position is chosen here — Newspaper's flight/hit-detection logic
 ## would not need to change.
+##
+## A brief windup gives the throw weight: pressing the button plays an
+## immediate anticipation squash, then the newspaper actually launches
+## (and the whoosh plays) a beat later. throw_windup_time = 0 restores
+## the old instant-throw behavior.
 
 @export var delivery_manager_path: NodePath
 @export var max_throw_range: float = 4.5
 @export var throw_height_offset: float = 1.1
 @export var throw_forward_offset: float = 0.5
+@export var throw_windup_time: float = 0.08
 
 const NEWSPAPER_SCENE := preload("res://scenes/world/Newspaper.tscn")
 
 @onready var _player: Player = get_parent()
 @onready var _delivery_manager: DeliveryManager = get_node_or_null(delivery_manager_path)
+@onready var _throw_audio: AudioStreamPlayer3D = get_node_or_null("../ThrowAudio")
+
+var _windup_remaining: float = -1.0
 
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
+	if _windup_remaining >= 0.0:
+		_windup_remaining -= delta
+		if _windup_remaining <= 0.0:
+			_windup_remaining = -1.0
+			_throw()
+		return
+
 	if PlayerInput.get_throw_just_pressed(_player.touch_controls):
-		_throw()
+		if not _delivery_manager or not _delivery_manager.get_active_mailbox():
+			return
+		if _player.visual_root and _player.visual_root.has_method("play_throw_feedback"):
+			_player.visual_root.play_throw_feedback()
+		if throw_windup_time > 0.0:
+			_windup_remaining = throw_windup_time
+		else:
+			_throw()
 
 
 func _throw() -> void:
@@ -41,3 +64,7 @@ func _throw() -> void:
 	_player.get_parent().add_child(newspaper)
 	_delivery_manager.register_newspaper(newspaper)
 	newspaper.launch(start, mailbox, max_throw_range)
+
+	if _throw_audio:
+		_throw_audio.pitch_scale = randf_range(0.95, 1.08)
+		_throw_audio.play()

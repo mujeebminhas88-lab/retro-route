@@ -1,0 +1,122 @@
+name: Build and Deploy Web
+
+# Builds the Godot Web (HTML5) export on every push/PR that touches the
+# game project, and publishes it to GitHub Pages whenever main is updated
+# (or the workflow is run manually). Pull requests get a build-only check
+# so a broken export can never reach main.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "game/**"
+      - ".github/workflows/deploy-web.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "game/**"
+      - ".github/workflows/deploy-web.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one Pages deployment at a time; never cancel one mid-flight.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+env:
+  GODOT_VERSION: 4.3-stable
+  GODOT_TEMPLATES_DIR: 4.3.stable
+  GODOT_EDITOR_SHA512: fd52bb4ba8acc30ca5accd1c566d470ad7282f891ccc0995dfafabcf92bcf76280ce182bf9d80ebd885f3ed2165d01e1fc3f2928436b15498dfbd98656c2a45a
+  GODOT_TEMPLATES_SHA512: 476366caf0fd45a8f24136cf9cf1dc0bc2b96f7c82d53e5f82200b55aefd07b286d283fd6f1ce29e0de70648c5a51d3b12f96c6d4fafd4e8c4878ecda6406d6a
+
+jobs:
+  build-web:
+    name: Build Web export
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Godot editor and export templates
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot-editor
+            ~/.local/share/godot/export_templates/${{ env.GODOT_TEMPLATES_DIR }}
+          key: godot-${{ env.GODOT_VERSION }}-web-v1
+
+      - name: Download Godot editor and Web export templates
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+
+          mkdir -p ~/godot-editor
+          curl -fSL --retry 5 --retry-delay 5 --retry-connrefused \
+            -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          echo "${GODOT_EDITOR_SHA512}  /tmp/godot.zip" | sha512sum -c -
+          unzip -q /tmp/godot.zip -d ~/godot-editor
+          mv "$HOME/godot-editor/Godot_v${GODOT_VERSION}_linux.x86_64" ~/godot-editor/godot
+          chmod +x ~/godot-editor/godot
+
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_TEMPLATES_DIR}"
+          curl -fSL --retry 5 --retry-delay 5 --retry-connrefused \
+            -o /tmp/templates.tpz \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz"
+          echo "${GODOT_TEMPLATES_SHA512}  /tmp/templates.tpz" | sha512sum -c -
+          unzip -q /tmp/templates.tpz "templates/web_*.zip" -d /tmp/templates-extracted
+          mv /tmp/templates-extracted/templates/*.zip "$HOME/.local/share/godot/export_templates/${GODOT_TEMPLATES_DIR}/"
+
+      - name: Import project assets
+        run: ~/godot-editor/godot --headless --path game --import
+
+      - name: Export Web build
+        run: |
+          set -euo pipefail
+          mkdir -p builds/web
+          ~/godot-editor/godot --headless --path game --export-release "Web" ../builds/web/index.html
+
+      - name: Verify build output
+        run: |
+          set -euo pipefail
+          for f in index.html index.wasm index.pck index.js; do
+            test -s "builds/web/$f" || { echo "::error::Missing or empty expected output file: $f"; exit 1; }
+          done
+          echo "Web build output verified."
+
+      - name: Upload build artifact (debugging/inspection)
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: builds/web
+          retention-days: 14
+
+      - name: Setup Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: builds/web
+
+  deploy:
+    name: Deploy to GitHub Pages
+    if: github.event_name != 'pull_request'
+    needs: build-web
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

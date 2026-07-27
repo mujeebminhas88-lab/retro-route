@@ -4,6 +4,15 @@ All notable changes to Retro Route will be documented in this file.
 
 ## [Unreleased]
 
+### Milestone: Continuous Deployment (Web)
+
+- Added a `Web` export preset to `game/export_presets.cfg` (nothreads variant, since GitHub Pages cannot serve the COOP/COEP headers required for WASM threads; PWA metadata enabled).
+- Added `.github/workflows/deploy-web.yml`: a two-job GitHub Actions pipeline that builds the Godot Web export on every push/PR touching `game/**`, verifies the output, uploads it as a workflow artifact, and deploys it to GitHub Pages on every push to `main` (or manual dispatch). Pull requests build but never deploy.
+- Godot editor + Web export templates are downloaded with pinned versions and SHA-512 checksum verification, and cached between CI runs.
+- Added `docs/DEPLOYMENT.md` documenting the pipeline, the GitHub Pages choice (and the Cloudflare Pages fallback if custom headers are ever needed for threading), how to trigger deployments, and how to reproduce the build locally.
+- Verified locally end-to-end: downloaded Godot 4.3 editor + Web export templates, ran the exact import/export commands the CI workflow runs, and confirmed the exported build boots and renders (WebGL2, no console/page errors) in both a desktop viewport and an emulated mobile viewport (Pixel 7) via headless Chromium, with a rendered screenshot confirming the ground/cube/house scene displays correctly.
+- Live URL (activates on first deploy from `main`): `https://mujeebminhas88-lab.github.io/retro-route/`
+
 ### Milestone: Project Foundation
 
 - Removed the fake placeholder files (`game/project.godot`, `game/scenes`, `game/scripts`, `game/assets`, `builds`) that had been created as empty stand-ins for folders on the `develop` branch and were never real project content.

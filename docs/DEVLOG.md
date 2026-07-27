@@ -134,16 +134,39 @@ Godot itself is not installed in the development container by default; a Godot 4
 
 ---
 
+## Day 3
+
+### Completed
+
+- Added a `Web` export preset (`game/export_presets.cfg`) — nothreads variant (GitHub Pages can't serve the COOP/COEP headers WASM threading needs), PWA metadata enabled.
+- Downloaded Godot 4.3's Web export templates and verified the `Web` preset exports successfully end to end, locally, producing a working `index.html` / `index.wasm` / `index.pck` bundle.
+- Served the exported build over HTTP and drove it with headless Chromium (Playwright): confirmed it boots, initializes a WebGL2 context, and renders the test scene with **zero console/page errors**, in both a desktop viewport and an emulated mobile viewport (Pixel 7). Took a screenshot confirming the ground/cube/house scene renders correctly.
+- Built `.github/workflows/deploy-web.yml`: CI builds the Web export on every push/PR touching `game/**` (checksum-verified Godot download, cached between runs), verifies the output files, and deploys to GitHub Pages on every push to `main` or manual dispatch. PRs build but don't deploy, so a broken export can't reach the live site.
+- Documented the whole pipeline in `docs/DEPLOYMENT.md`, including why GitHub Pages was chosen over an alternative like Cloudflare Pages, and when that choice would need to change (custom headers for threading).
+
+### Notes
+
+This milestone deliberately stayed off `main` — the workflow is written to deploy from `main`, but was validated via manual `workflow_dispatch` runs from this feature branch first, since GitHub Pages deployment via `actions/deploy-pages` works regardless of which branch triggers the run (Pages config is a repo-level setting, not branch-specific). Once this branch is approved and merged, every future push to `main` deploys automatically with no further setup.
+
+### Next Session
+
+- Merge this branch into `main` (after approval) and confirm the first automatic `main`-triggered deployment goes green.
+- Build the real player/bike controller and hook it into `scenes/player/`.
+- Build a proper chase/follow camera rig.
+
+---
+
 # Current Version
 
-v0.0.2 (Pre-Production — Project Foundation)
+v0.0.3 (Pre-Production — Continuous Deployment)
 
 ---
 
 # Known Issues
 
-- No Android export templates or Android SDK installed in the current dev environment, so the Android export preset is untested end-to-end (project-side configuration only).
-- Running the project under `--headless` (no GPU/display) logs a benign `mesh_get_surface_count` "Parameter m is null" error per `MeshInstance3D` — this is a known artifact of Godot's dummy rendering driver used for headless validation and does not occur with a real display/GPU.
+- No Android export templates or Android SDK installed in the current dev environment, so the Android export preset is untested end-to-end (project-side configuration only). Android is not yet part of the CI/CD pipeline.
+- Running the project under `--headless` (no GPU/display) logs a benign `mesh_get_surface_count` "Parameter m is null" error per `MeshInstance3D` — this is a known artifact of Godot's dummy rendering driver used for headless validation and does not occur with a real display/GPU or in the exported Web build (confirmed clean in an actual browser).
+- WASM multithreading is disabled in the Web export preset because GitHub Pages cannot serve the `Cross-Origin-Opener-Policy` / `Cross-Origin-Embedder-Policy` headers it requires. Not a problem today; would need Cloudflare Pages (or similar) if threading becomes necessary later.
 
 ---
 

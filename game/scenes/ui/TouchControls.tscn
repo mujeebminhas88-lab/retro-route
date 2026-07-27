@@ -1,0 +1,54 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/touch_controls.gd" id="1_jmbax"]
+[ext_resource type="Script" path="res://scripts/ui/virtual_joystick.gd" id="2_2uveg"]
+[ext_resource type="Script" path="res://scripts/ui/touch_button.gd" id="3_jvgni"]
+
+[node name="TouchControls" type="CanvasLayer"]
+script = ExtResource("1_jmbax")
+
+[node name="VirtualJoystick" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 40.0
+offset_top = -200.0
+offset_right = 200.0
+offset_bottom = -40.0
+script = ExtResource("2_2uveg")
+dead_zone = 0.08
+base_color = Color(1, 1, 1, 0.18)
+knob_color = Color(1, 1, 1, 0.45)
+
+[node name="JumpButton" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -160.0
+offset_top = -160.0
+offset_right = -40.0
+offset_bottom = -40.0
+script = ExtResource("3_jvgni")
+label_text = "JUMP"
+base_color = Color(1, 1, 1, 0.22)
+pressed_color = Color(1, 1, 1, 0.45)
+
+[node name="ThrowButton" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -290.0
+offset_top = -200.0
+offset_right = -190.0
+offset_bottom = -100.0
+script = ExtResource("3_jvgni")
+label_text = "THROW"
+base_color = Color(1, 0.7, 0.2, 0.3)
+pressed_color = Color(1, 0.7, 0.2, 0.6)

@@ -1,0 +1,36 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hsn1x"]
+albedo_color = Color(0.42, 0.3, 0.2, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_dkcjx"]
+top_radius = 0.1
+bottom_radius = 0.14
+height = 5.0
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_xxif1"]
+size = Vector3(0.28, 5, 0.28)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_uvqng"]
+albedo_color = Color(0.35, 0.24, 0.16, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_jfiww"]
+size = Vector3(1.4, 0.12, 0.12)
+
+[node name="TelephonePole" type="Node3D"]
+
+[node name="Body" type="StaticBody3D" parent="."]
+
+[node name="Pole" type="MeshInstance3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
+material_override = SubResource("StandardMaterial3D_hsn1x")
+mesh = SubResource("CylinderMesh_dkcjx")
+
+[node name="@CollisionShape3D@4" type="CollisionShape3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
+shape = SubResource("BoxShape3D_xxif1")
+
+[node name="Crossbar" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.4, 0)
+material_override = SubResource("StandardMaterial3D_uvqng")
+mesh = SubResource("BoxMesh_jfiww")

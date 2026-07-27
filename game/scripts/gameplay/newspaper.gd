@@ -1,12 +1,12 @@
 class_name Newspaper
 extends Node3D
 
-## Kinematic (non-physics) throw projectile. Hit/miss is decided once,
-## at launch time, from throw distance vs. max_range — not from runtime
-## collision — which keeps delivery deterministic and easy to follow.
-## `launch()` takes an explicit target position rather than reading the
-## mailbox itself, so a future manual-aim mode can pass any point here
-## without changing this class at all.
+## Kinematic (non-physics) throw projectile. Hit/miss is decided by the
+## caller (Thrower) before launch and passed in explicitly -- this class
+## only animates the flight from start to end and fires the matching
+## signal when it lands, keeping delivery deterministic and easy to
+## follow without needing to know anything about mailboxes, throw
+## sides, or ranges itself.
 
 signal delivered(mailbox: Node3D)
 signal missed
@@ -29,22 +29,15 @@ var _is_hit: bool = false
 var _finished: bool = false
 
 
-func launch(start: Vector3, target_mailbox: Node3D, max_range: float) -> void:
+## `end` is the exact landing point: the mailbox's delivery point for a
+## hit, or a point out to the thrown side for a miss. `target_mailbox`
+## is only used (and only needed) when `is_hit` is true, to know which
+## mailbox's `delivered` signal to report.
+func launch(start: Vector3, end: Vector3, is_hit: bool, target_mailbox: Node3D = null) -> void:
 	_start = start
+	_end = end
+	_is_hit = is_hit
 	_target_mailbox = target_mailbox
-
-	var target_point: Vector3 = target_mailbox.get_delivery_point() if target_mailbox.has_method("get_delivery_point") else target_mailbox.global_position
-	var to_target := target_point - start
-	var flat_distance := Vector2(to_target.x, to_target.z).length()
-
-	if flat_distance <= max_range:
-		_is_hit = true
-		_end = target_point
-	else:
-		_is_hit = false
-		var flat_dir := Vector2(to_target.x, to_target.z).normalized()
-		_end = start + Vector3(flat_dir.x, 0.0, flat_dir.y) * max_range
-
 	_elapsed = 0.0
 	global_position = _start
 

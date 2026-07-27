@@ -1,54 +1,63 @@
 [gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/touch_controls.gd" id="1_jmbax"]
-[ext_resource type="Script" path="res://scripts/ui/virtual_joystick.gd" id="2_2uveg"]
-[ext_resource type="Script" path="res://scripts/ui/touch_button.gd" id="3_jvgni"]
+[ext_resource type="Script" path="res://scripts/ui/touch_button.gd" id="2_tbtn"]
+[ext_resource type="Script" path="res://scripts/ui/swipe_throw_gesture.gd" id="3_swipe"]
 
 [node name="TouchControls" type="CanvasLayer"]
 script = ExtResource("1_jmbax")
 
-[node name="VirtualJoystick" type="Control" parent="."]
+[node name="SwipeThrowGesture" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("3_swipe")
+
+[node name="LeftButton" type="Control" parent="."]
 layout_mode = 3
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 40.0
-offset_top = -200.0
-offset_right = 200.0
+offset_top = -220.0
+offset_right = 220.0
 offset_bottom = -40.0
-script = ExtResource("2_2uveg")
-dead_zone = 0.08
-base_color = Color(1, 1, 1, 0.18)
-knob_color = Color(1, 1, 1, 0.45)
-
-[node name="JumpButton" type="Control" parent="."]
-layout_mode = 3
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -160.0
-offset_top = -160.0
-offset_right = -40.0
-offset_bottom = -40.0
-script = ExtResource("3_jvgni")
-label_text = "JUMP"
+script = ExtResource("2_tbtn")
+label_text = "LEFT"
 base_color = Color(1, 1, 1, 0.22)
 pressed_color = Color(1, 1, 1, 0.45)
 
-[node name="ThrowButton" type="Control" parent="."]
+[node name="BrakeButton" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -90.0
+offset_top = -220.0
+offset_right = 90.0
+offset_bottom = -40.0
+script = ExtResource("2_tbtn")
+label_text = "BRAKE"
+base_color = Color(1, 0.35, 0.3, 0.28)
+pressed_color = Color(1, 0.35, 0.3, 0.55)
+
+[node name="RightButton" type="Control" parent="."]
 layout_mode = 3
 anchors_preset = 3
 anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -290.0
-offset_top = -200.0
-offset_right = -190.0
-offset_bottom = -100.0
-script = ExtResource("3_jvgni")
-label_text = "THROW"
-base_color = Color(1, 0.7, 0.2, 0.3)
-pressed_color = Color(1, 0.7, 0.2, 0.6)
+offset_left = -220.0
+offset_top = -220.0
+offset_right = -40.0
+offset_bottom = -40.0
+script = ExtResource("2_tbtn")
+label_text = "RIGHT"
+base_color = Color(1, 1, 1, 0.22)
+pressed_color = Color(1, 1, 1, 0.45)

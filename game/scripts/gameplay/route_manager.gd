@@ -2,16 +2,17 @@ class_name RouteManager
 extends Node3D
 
 ## Owns the whole route session: state (idle/countdown/active/complete),
-## the fixed delivery order, the newspaper bundle, timing, and
-## statistics. Newspaper and Mailbox stay ignorant of any of this — this
-## is the single place that decides what a throw/delivery means for the
-## current run.
+## timing, and delivery statistics. Milestone 10 changed the route from
+## a fixed hand-placed mailbox list to a streamed one -- mailboxes don't
+## exist ahead of time, so RoadStreamer (or any future spawner) calls
+## register_mailbox() as each one is placed, and this class queues and
+## activates them in arrival order. Route completion is now a delivery
+## COUNT (delivery_target) rather than "reached the end of the list",
+## since a streamed route has no fixed end.
 ##
-## The delivery order itself is scene data (`route_mailboxes`), not
-## hard-coded here, so this script is reusable for any future
-## neighborhood: point it at a different ordered list of mailboxes and
-## the whole flow (countdown, bundle, timing, results) comes along for
-## free.
+## Newspaper and Mailbox stay ignorant of any of this — this is the
+## single place that decides what a throw/delivery means for the
+## current run.
 
 enum State { IDLE, COUNTDOWN, ACTIVE, COMPLETE }
 
@@ -20,31 +21,45 @@ const COUNTDOWN_STEPS: Array[String] = ["3", "2", "1", "GO!"]
 signal state_changed(new_state: State)
 signal countdown_step(text: String)
 signal score_changed(new_score: int)
-signal deliveries_changed(completed: int, total: int)
+signal deliveries_changed(completed: int, target: int)
 signal newspapers_changed(remaining: int)
 signal time_changed(seconds: float)
 signal delivery_succeeded(mailbox: Node3D)
 signal delivery_missed
 signal route_completed(stats: Dictionary)
+## Fires once, the instant the route becomes ACTIVE (GO). A distinct
+## signal from state_changed so listeners that only care about "the ride
+## just began" (RoadStreamer's initial fill, a future boost hook) don't
+## need to match on the State enum.
+signal route_started
 
-@export var route_mailboxes: Array[NodePath] = []
+@export var delivery_target: int = 20
 @export var points_per_delivery: int = 10
 @export var delivery_sound_pitch_variance: float = 0.06
-@export var bundle_padding: int = 0
+## Newspaper supply is generous rather than exactly-sized, since a
+## streamed route has no fixed length to size it against -- large enough
+## that it's effectively unlimited across a normal run to delivery_target,
+## while keeping the exact same consume/refund-on-miss mechanic proven
+## in Milestone 9 (a miss still never permanently costs the run).
+@export var bundle_padding: int = 500
 @export var countdown_step_duration: float = 0.8
+## If the player rides this far past the active mailbox without
+## delivering, it's skipped and the next queued one activates instead --
+## a missed/ignored mailbox can never permanently stall progress toward
+## delivery_target.
+@export var mailbox_skip_margin: float = 6.0
 
 const FLOATING_POPUP_SCENE := preload("res://scenes/ui/FloatingPopup.tscn")
 
 var score: int = 0
 var state: State = State.IDLE
 
-var _route_mailboxes: Array[Node] = []
-var _route_index: int = 0
+var _active_mailbox: Node3D = null
+var _pending_mailboxes: Array[Node3D] = []
 var _deliveries_completed: int = 0
 var _throws_made: int = 0
 var _hits_made: int = 0
 var _newspapers_remaining: int = 0
-var _bundle_size: int = 0
 var _route_time: float = 0.0
 var _countdown_step_index: int = 0
 var _countdown_step_elapsed: float = 0.0
@@ -54,15 +69,6 @@ var _countdown_step_elapsed: float = 0.0
 @onready var _celebration_burst: GPUParticles3D = get_node_or_null("CelebrationBurst")
 @onready var _camera: Node = get_node_or_null("../CameraRig")
 @onready var _player: Node3D = get_node_or_null("../Player")
-
-
-func _ready() -> void:
-	for path in route_mailboxes:
-		var mb := get_node_or_null(path)
-		if mb:
-			_route_mailboxes.append(mb)
-			mb.set_active(false)
-	_bundle_size = _route_mailboxes.size() + bundle_padding
 
 
 func _process(delta: float) -> void:
@@ -79,6 +85,7 @@ func _process(delta: float) -> void:
 		State.ACTIVE:
 			_route_time += delta
 			time_changed.emit(_route_time)
+			_check_skip_passed_mailbox()
 
 
 func start_route() -> void:
@@ -90,6 +97,11 @@ func start_route() -> void:
 func restart_route() -> void:
 	if state != State.COMPLETE:
 		return
+	# A fresh run needs a fresh streamed world, not the tail end of the
+	# last one -- RoadStreamer listens for state_changed back to
+	# COUNTDOWN and resets itself before GO.
+	_active_mailbox = null
+	_pending_mailboxes.clear()
 	_begin_countdown()
 
 
@@ -103,9 +115,17 @@ func consume_newspaper() -> bool:
 
 
 func get_active_mailbox() -> Node3D:
-	if state != State.ACTIVE or _route_index >= _route_mailboxes.size():
-		return null
-	return _route_mailboxes[_route_index]
+	return _active_mailbox if state == State.ACTIVE else null
+
+
+## Called by RoadStreamer (or any future mailbox spawner) as each new
+## mailbox is placed into the world. Queued in arrival order; if there's
+## no currently active mailbox, this one (or the front of the queue)
+## activates immediately.
+func register_mailbox(mailbox: Node3D) -> void:
+	mailbox.set_active(false)
+	_pending_mailboxes.append(mailbox)
+	_activate_next_if_needed()
 
 
 func register_newspaper(newspaper: Newspaper) -> void:
@@ -127,20 +147,36 @@ func _begin_active() -> void:
 	_deliveries_completed = 0
 	_throws_made = 0
 	_hits_made = 0
-	_route_index = 0
 	_route_time = 0.0
-	_newspapers_remaining = _bundle_size
-
-	for mb in _route_mailboxes:
-		mb.set_active(false)
-	if not _route_mailboxes.is_empty():
-		_route_mailboxes[0].set_active(true)
+	_newspapers_remaining = delivery_target + bundle_padding
+	_active_mailbox = null
 
 	state_changed.emit(state)
 	score_changed.emit(score)
-	deliveries_changed.emit(_deliveries_completed, _route_mailboxes.size())
+	deliveries_changed.emit(_deliveries_completed, delivery_target)
 	newspapers_changed.emit(_newspapers_remaining)
 	time_changed.emit(_route_time)
+	route_started.emit()
+
+	_activate_next_if_needed()
+
+
+func _activate_next_if_needed() -> void:
+	if state != State.ACTIVE or _active_mailbox != null:
+		return
+	if _pending_mailboxes.is_empty():
+		return
+	_active_mailbox = _pending_mailboxes.pop_front()
+	_active_mailbox.set_active(true)
+
+
+func _check_skip_passed_mailbox() -> void:
+	if not _active_mailbox or not _player:
+		return
+	if _player.global_position.z < _active_mailbox.global_position.z - mailbox_skip_margin:
+		_active_mailbox.set_active(false)
+		_active_mailbox = null
+		_activate_next_if_needed()
 
 
 func _on_delivered(mailbox: Node3D) -> void:
@@ -148,7 +184,7 @@ func _on_delivered(mailbox: Node3D) -> void:
 	score += points_per_delivery
 	score_changed.emit(score)
 	_deliveries_completed += 1
-	deliveries_changed.emit(_deliveries_completed, _route_mailboxes.size())
+	deliveries_changed.emit(_deliveries_completed, delivery_target)
 	delivery_succeeded.emit(mailbox)
 
 	if mailbox.has_method("play_delivered_feedback"):
@@ -156,38 +192,38 @@ func _on_delivered(mailbox: Node3D) -> void:
 
 	_spawn_score_popup(mailbox)
 	_play_delivery_sound(mailbox)
-	_advance_route()
+
+	if mailbox == _active_mailbox:
+		_active_mailbox = null
+
+	if _deliveries_completed >= delivery_target:
+		_complete_route()
+	else:
+		_activate_next_if_needed()
 
 
 func _on_missed() -> void:
 	# A miss never permanently costs the route — refund the newspaper so
-	# frustration stays low during the prototype phase (per design brief).
+	# frustration stays low.
 	_newspapers_remaining += 1
 	newspapers_changed.emit(_newspapers_remaining)
 	delivery_missed.emit()
-
-
-func _advance_route() -> void:
-	if _route_index >= _route_mailboxes.size():
-		return
-	_route_mailboxes[_route_index].set_active(false)
-	_route_index += 1
-	if _route_index >= _route_mailboxes.size():
-		_complete_route()
-	else:
-		_route_mailboxes[_route_index].set_active(true)
 
 
 func _complete_route() -> void:
 	state = State.COMPLETE
 	state_changed.emit(state)
 
+	if _active_mailbox:
+		_active_mailbox.set_active(false)
+		_active_mailbox = null
+
 	var accuracy := 100.0 if _throws_made == 0 else (float(_hits_made) / float(_throws_made)) * 100.0
 	var is_new_best := SaveData.save_best_score_if_higher(score)
 	var stats := {
 		"score": score,
 		"deliveries": _deliveries_completed,
-		"total": _route_mailboxes.size(),
+		"total": delivery_target,
 		"accuracy": accuracy,
 		"time": _route_time,
 		"best_score": SaveData.load_best_score(),

@@ -1,0 +1,34 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_y044l"]
+albedo_color = Color(0.82, 0.71, 0.55, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_7ysqi"]
+size = Vector3(4, 3, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_fk6gh"]
+size = Vector3(4, 3, 4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wvqn5"]
+albedo_color = Color(0.55, 0.15, 0.12, 1)
+
+[sub_resource type="PrismMesh" id="PrismMesh_nu5vu"]
+size = Vector3(4.6, 1.8, 4.6)
+
+[node name="House" type="Node3D"]
+
+[node name="Body" type="StaticBody3D" parent="."]
+
+[node name="WallsMesh" type="MeshInstance3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+material_override = SubResource("StandardMaterial3D_y044l")
+mesh = SubResource("BoxMesh_7ysqi")
+
+[node name="WallsShape" type="CollisionShape3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
+shape = SubResource("BoxShape3D_fk6gh")
+
+[node name="RoofMesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.9, 0)
+material_override = SubResource("StandardMaterial3D_wvqn5")
+mesh = SubResource("PrismMesh_nu5vu")

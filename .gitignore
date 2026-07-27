@@ -1,0 +1,24 @@
+# Godot 4+ specific ignores
+game/.godot/
+game/.import/
+game/export.cfg
+game/export_credentials.cfg
+
+# Exported Android build artifacts
+builds/
+*.apk
+*.aab
+
+# Android/Java signing keys - never commit these
+*.keystore
+*.jks
+
+# Godot mono-specific ignores
+game/.mono/
+game/data_*/
+
+# System / editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp

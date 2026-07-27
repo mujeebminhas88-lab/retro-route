@@ -1,0 +1,65 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/world/House.tscn" id="1_iev0r"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_2kpdd"]
+
+[sub_resource type="Sky" id="Sky_caspf"]
+sky_material = SubResource("ProceduralSkyMaterial_2kpdd")
+
+[sub_resource type="Environment" id="Environment_h152g"]
+background_mode = 2
+sky = SubResource("Sky_caspf")
+ambient_light_source = 3
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_l5s17"]
+albedo_color = Color(0.25, 0.55, 0.25, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_u8h80"]
+size = Vector2(50, 50)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_4wogh"]
+size = Vector3(50, 0.1, 50)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_au5c4"]
+albedo_color = Color(0.2, 0.4, 0.85, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_cox2a"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_5lpxu"]
+
+[node name="TestScene" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_h152g")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, 0.353553, -0.353553, 0, 0.707107, 0.707107, 0.5, -0.612372, 0.612372, 0, 0, 0)
+shadow_enabled = true
+
+[node name="Ground" type="StaticBody3D" parent="."]
+
+[node name="GroundMesh" type="MeshInstance3D" parent="Ground"]
+material_override = SubResource("StandardMaterial3D_l5s17")
+mesh = SubResource("PlaneMesh_u8h80")
+
+[node name="GroundShape" type="CollisionShape3D" parent="Ground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+shape = SubResource("BoxShape3D_4wogh")
+
+[node name="Cube" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0.5, 3)
+
+[node name="CubeMesh" type="MeshInstance3D" parent="Cube"]
+material_override = SubResource("StandardMaterial3D_au5c4")
+mesh = SubResource("BoxMesh_cox2a")
+
+[node name="CubeShape" type="CollisionShape3D" parent="Cube"]
+shape = SubResource("BoxShape3D_5lpxu")
+
+[node name="House" type="Node3D" parent="." instance=ExtResource("1_iev0r")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0, -6)
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.882948, 0.469472, 0, -0.469472, 0.882948, 0, 8, 14)
+current = true

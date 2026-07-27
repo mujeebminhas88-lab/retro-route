@@ -4,6 +4,19 @@ All notable changes to Retro Route will be documented in this file.
 
 ## [Unreleased]
 
+Nothing yet — development for the next milestone happens on its own feature branch and lands here once merged.
+
+## [v0.1.0-alpha] - 2026-07-27
+
+First production release. Promotes the approved work from Milestones 1-5 (project foundation, continuous deployment, first playable locomotion, first complete gameplay loop) to `main` and to the public Web deployment. See the milestone sections below for full detail; summary:
+
+- A real, working Godot 4.3 project (previously the repo only had placeholder files).
+- An automated Web build pipeline: every push to `main` builds, verifies, and deploys to GitHub Pages.
+- A polished third-person arcade locomotion system (walk/run/jump/camera) usable from both keyboard and mobile touch controls.
+- A complete, replayable core gameplay loop: throw newspapers at an auto-targeted mailbox, deliver, score, repeat.
+
+**Live URL:** https://mujeebminhas88-lab.github.io/retro-route/
+
 ### Milestone: First Complete Gameplay Loop (Deliveries)
 
 - Added the delivery gameplay loop: throw newspapers at an auto-targeted active mailbox, score on hit, next mailbox activates automatically.

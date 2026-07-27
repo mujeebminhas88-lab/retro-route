@@ -50,7 +50,7 @@ The objective is not to recreate any existing game, but to capture the freedom, 
 
 - [x] Player movement
 - [x] Camera system
-- [ ] Bike controller
+- [x] Bike controller
 - [ ] Basic neighborhood
 - [x] Delivery system
 - [x] Score system
@@ -217,9 +217,32 @@ Testing: a headless scripted test asserts score stays 0 on a from-spawn miss, be
 
 ---
 
+## Day 6
+
+### Completed
+
+- Replaced walking with the first arcade BMX prototype ("The BMX Begins" milestone), following v0.1.0-alpha's release to `main`. Vehicle-style controls: forward/back is throttle/brake, steering turns the bike — no wheel colliders, no suspension, no gear shifting, no manual balancing, by design. This is arcade fun (Paperboy-style), not a bicycle simulation.
+- Every movement tuning value is exported (`top_speed`, `reverse_speed_ratio`, `acceleration`, `braking`, `steering_sensitivity`, `turning_radius`, `min_turn_speed`, plus visual-feel knobs), not hard-coded, per the milestone brief.
+- The player now spawns already mounted — riding the BMX is the only locomotion mode, there's no separate mount/dismount step.
+- Added subtle speed-scaled lean, pitch, and wheel spin, all on a new `LeanPivot` child kept deliberately separate from `VisualRoot` so it can never interfere with the facing vector the camera and throwing system read.
+- Rebuilt the player scene with simple primitive bike geometry (frame, handlebar, two spinning wheels) sitting under the existing placeholder character; camera, gravity, jump, and the whole delivery gameplay loop were left untouched and required no changes beyond the movement source.
+
+### Notes
+
+One real bug, caught before it shipped: the first version of the steering math turned the bike the *wrong* way — pressing right turned it left. It wasn't obvious from reading the code; it only showed up once a live browser test tried to steer toward a specific mailbox and the bike visibly curved away instead. Traced it to a sign mismatch against the `Basis.looking_at()` convention the rest of the game already relies on (facing world +X corresponds to a *negative* `rotation.y`) and fixed the one sign in `_update_steering`.
+
+Testing needed a different trick than previous milestones. The old camera-relative locomotion could be driven open-loop (just hold a direction and it goes that way); a vehicle-style controller can't — a blind "drive forward and hope" script either circles too tightly (full-lock steering always resolves to the same ~1.6m circle radius regardless of speed, an interesting side effect of the turning formula) or overshoots the whole 60m map in a couple of seconds at top speed. Two things made this tractable: a scripted headless test that reads and asserts on the real `Player` node's state frame-by-frame (acceleration, braking, steering angle, and a full ride-while-throwing delivery), and, for the real exported Web build, a temporary debug bridge (removed before commit) that exposed live position/heading to the browser test so it could steer toward the actual active mailbox instead of guessing blind. Both a genuine keyboard session and a genuine synthetic-touch session delivered successfully (Score: 10) with zero console errors.
+
+### Next Session
+
+- Build the first gray-box neighborhood block for the bike to actually ride through.
+- Revisit the on-screen directional cue toward the active mailbox — more noticeable now that the bike covers ground faster than walking did.
+
+---
+
 # Current Version
 
-v0.0.5 (Alpha — First Complete Gameplay Loop)
+v0.1.0-alpha (released) — Milestone 6 "The BMX Begins" in progress on its own branch, not yet merged to `main`.
 
 ---
 
@@ -232,6 +255,8 @@ v0.0.5 (Alpha — First Complete Gameplay Loop)
 - Concurrent multitouch (dragging the joystick while tapping jump/throw) relies on Godot's native browser touch handling, which is well-established engine behavior; it was exercised sequentially in automated testing rather than via a hand-crafted concurrent synthetic touch sequence, since accurately simulating true concurrent multitouch through raw DOM events is significantly more complex than the engine behavior it would be verifying.
 - No on-screen indicator for *which direction* the active mailbox is when it's off-screen — the player currently has to explore/remember the map. The gold target ring is only visible once the mailbox is in view.
 - The delivery chime is a single procedurally-generated placeholder tone, not mixed/mastered audio.
+- The BMX has no collision-based crash/fail state — riding into the House or Cube props (or any scenery) just stops the bike against the obstacle rather than producing dedicated feedback (a bump animation, a sound, etc.). Fine for now since the neighborhood is still a gray-box test area, worth revisiting once real level geometry exists.
+- The BMX's placeholder frame/wheel geometry is intentionally simple (primitive meshes matching the existing low-poly placeholder character) and not final bike art.
 
 ---
 

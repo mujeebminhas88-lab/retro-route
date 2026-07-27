@@ -15,14 +15,6 @@ static func get_move_vector(touch_controls: Node) -> Vector2:
 	return Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 
 
-static func get_speed_scale(touch_controls: Node) -> float:
-	if touch_controls and touch_controls.has_method("get_move_vector"):
-		var touch_vec: Vector2 = touch_controls.get_move_vector()
-		if touch_vec.length_squared() > 0.0001:
-			return clampf(touch_vec.length(), 0.0, 1.0)
-	return 0.5 if Input.is_action_pressed("walk_modifier") else 1.0
-
-
 static func get_jump_just_pressed(touch_controls: Node) -> bool:
 	if Input.is_action_just_pressed("jump"):
 		return true

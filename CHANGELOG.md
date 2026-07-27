@@ -4,6 +4,31 @@ All notable changes to Retro Route will be documented in this file.
 
 ## [Unreleased]
 
+### Milestone: The First Route
+
+The sandbox becomes the game's first complete playable session: spawn, a "START ROUTE" prompt, a 3-2-1-GO! countdown, a fixed 5-mailbox route delivered in a taught order, a results screen, and Play Again. No new mechanics beyond the route itself — traffic, pedestrians, shops, unlocks, progression, coins, weather, multiplayer, and new neighborhoods are explicitly out of scope for this milestone.
+
+**RouteManager** (`game/scripts/gameplay/route_manager.gd`, renamed from `delivery_manager.gd`)
+- Replaces the old shuffle-and-repeat `DeliveryManager` with a dedicated state machine (`IDLE` -> `COUNTDOWN` -> `ACTIVE` -> `COMPLETE`) that owns the route's delivery order, the newspaper bundle, timing, and statistics.
+- The delivery order is exported scene data (`route_mailboxes: Array[NodePath]`), not hard-coded — the script is reusable for any future neighborhood's route by pointing it at a different ordered list.
+- This milestone's fixed route is `Mailbox1 -> Mailbox4 -> Mailbox3 -> Mailbox5 -> Mailbox2` (skipping `Mailbox0`), chosen from the real distances in the Milestone 7 neighborhood so difficulty ramps naturally: Mailbox1 is the closest (~6m, an easy first delivery), Mailbox4 is a short hop across the street, Mailbox3 requires turning back the way the player came, Mailbox5 is the longest ride of the route (~40m), and Mailbox2 is a short, satisfying final hop.
+- **Newspaper bundle**: sized to exactly the route length (5 newspapers for 5 mailboxes) instead of the previous infinite supply. A missed throw refunds the newspaper rather than costing the run permanently, so a bad throw never blocks completion — this is the same `consume_newspaper()`/refund-on-miss mechanic doing double duty for both requirements (limited supply, low-frustration misses) without extra state.
+- Route completion computes accuracy (hits / total throws), elapsed time, and saves a new local best score via a new `SaveData` helper (`game/scripts/systems/save_data.gd`), which persists through Godot's `ConfigFile` to `user://` — backed by IndexedDB in the Web export, so it survives page reloads.
+
+**Flow UI** (`game/scripts/ui/route_intro_ui.gd` + `RouteIntroUI.tscn`, `results_screen.gd` + `ResultsScreen.tscn`)
+- `RouteIntroUI`: a "START ROUTE" button while idle, replaced by an animated 3-2-1-GO! countdown once pressed — both purely reactive to `RouteManager`'s signals.
+- `ResultsScreen`: "ROUTE COMPLETE!", score, deliveries, accuracy, time, and best score (with a "New Best!" flourish), plus a Play Again button that calls `RouteManager.restart_route()`.
+- The brief's literal flow diagram listed the countdown before the "Press START ROUTE" step; this was reordered to idle-then-countdown, since a countdown preceding its own trigger has no coherent UX reading — documented here as a deliberate interpretation, not a silent assumption.
+
+**HUD** (`game/scripts/ui/hud.gd`, `HUD.tscn`)
+- Added deliveries-completed, newspapers-remaining, and a route timer alongside the existing score label — all purely reactive to `RouteManager` signals, unchanged responsibility split from previous milestones.
+
+**Completion polish** — kept deliberately subtle and reused existing mechanisms rather than adding new state:
+- `FollowCamera.celebrate()` reuses the same decaying landing-impulse mechanism from Milestone 8 with an opposite sign (a small rise instead of a dip), so no new per-frame branch or state was added.
+- A new procedurally-synthesized fanfare (`game/audio/route_complete_fanfare.tres`, same build-time PCM-synthesis technique as the rest of the audio kit — a short four-note ascending arpeggio) and a one-shot gold particle burst play once on route completion.
+
+**Testing**: a headless scripted test drives the real `Playground` scene through a full session (RouteManager starts `IDLE`, `start_route()` enters `COUNTDOWN`, transitions to `ACTIVE` with the bundle sized to exactly 5, a deliberate miss refunds its newspaper without counting as a delivery, all 5 deliveries complete in the expected order, score lands on exactly 50, results screen shows the correct score/deliveries/accuracy, best score persists via `SaveData`, and `restart_route()` re-enters `COUNTDOWN`) — 26/26 assertions passed. In the real exported Web build, both a genuine keyboard session (real mouse clicks on START ROUTE/PLAY AGAIN, real `F` keypresses per throw) and a genuine touch session (real taps) completed the full route end-to-end (Score: 50, 5/5 deliveries, ROUTE COMPLETE screen, successful restart) with zero console errors; a closed-loop bot handled aiming and throwing, using a temporary debug bridge (removed before commit, same pattern as prior milestones) to skip only BMX-pathing between mailboxes, since steering competently isn't what this test verifies — the headless test above already exhaustively covers the route logic itself, including full completion without any test-only shortcuts.
+
 ### Milestone: Game Feel
 
 Not a gameplay milestone — no new mechanics. Every change here is tuning, feedback, or polish on the existing ride/throw/deliver loop, and every tunable introduced is an `@export` (nothing hard-coded).

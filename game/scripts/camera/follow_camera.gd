@@ -44,6 +44,9 @@ extends Node3D
 @export var landing_impulse_min_fall_speed: float = 6.0
 @export var landing_impulse_fall_speed_reference: float = 14.0
 
+@export_group("Celebration")
+@export var celebration_impulse_strength: float = 0.3
+
 @onready var spring_arm: SpringArm3D = $SpringArm3D
 
 var _target: Node3D
@@ -133,3 +136,11 @@ func _on_target_landed(fall_speed: float) -> void:
 		return
 	var strength := clampf(fall_speed / maxf(landing_impulse_fall_speed_reference, 0.01), 0.0, 1.0)
 	_landing_impulse = -landing_impulse_strength * strength
+
+
+## A small upward camera bump for route-complete celebrations. Reuses
+## the same decaying impulse the landing bump already drives — opposite
+## sign (rises instead of dips) so it reads as a distinct, positive beat
+## rather than another landing.
+func celebrate() -> void:
+	_landing_impulse = celebration_impulse_strength

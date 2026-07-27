@@ -293,9 +293,41 @@ Verified with a headless scripted test against the real `Playground` scene (acce
 
 ---
 
+## Day 9
+
+### Completed
+
+- Merged Milestone 8 (Game Feel) to `main`, confirmed CI + Pages deploy green, then built Milestone 9 ("The First Route") on its own branch: turns the sandbox into the game's first complete playable session — spawn, a "START ROUTE" prompt, a 3-2-1-GO! countdown, a fixed 5-mailbox route delivered in a taught order, ROUTE COMPLETE, a results screen, and Play Again.
+- Replaced `DeliveryManager` with `RouteManager` (`game/scripts/gameplay/route_manager.gd`, same file renamed rather than layered alongside — the delivery-order logic fundamentally changes from group-shuffle to a fixed ordered list, and the new responsibilities are strictly a superset of the old ones). Its delivery order is exported scene data (`Array[NodePath]`), not hard-coded, so the same script is reusable for any future neighborhood.
+- Route design: `Mailbox1 -> Mailbox4 -> Mailbox3 -> Mailbox5 -> Mailbox2` (skipping `Mailbox0`), picked by computing real distances in the Milestone 7 neighborhood so difficulty ramps close -> a bit farther -> a turn back the way the player came -> the route's longest ride (~40m) -> a short, satisfying final hop.
+- Newspaper bundle: exactly 5 newspapers for the 5-stop route (previously infinite). A miss refunds the newspaper via the existing hit/miss signal path rather than costing the run — one mechanic satisfying both "limited supply" and "misses shouldn't be punishing."
+- New `SaveData` helper (`game/scripts/systems/save_data.gd`) persists a local best score via `ConfigFile` to `user://` (IndexedDB-backed in the Web export, survives reloads).
+- New flow UI: `RouteIntroUI` (START ROUTE button -> animated countdown) and `ResultsScreen` (score/deliveries/accuracy/time/best score + Play Again), both purely reactive to `RouteManager` signals, matching the existing HUD's relay-only pattern.
+- Completion polish stayed deliberately subtle and reused existing mechanisms: `FollowCamera.celebrate()` is the same decaying landing-impulse code from Milestone 8 with the sign flipped (a small rise instead of a dip), and a new short four-note fanfare (same build-time PCM synthesis as the rest of the audio kit) plus a one-shot gold particle burst play once on completion.
+
+### Notes
+
+The brief's literal flow diagram listed the countdown *before* "Press START ROUTE." Read literally that has no coherent UX reading (a countdown can't precede its own trigger), so the flow was reordered to idle-with-a-prompt -> countdown -> active, which is what actually ships. Flagging this here as a deliberate interpretation rather than a silent deviation.
+
+Two real bugs, both caught by testing rather than code review:
+
+1. The first headless wiring run (renaming `DeliveryManager` to `RouteManager`, re-pointing its script, wiring the new UI) executed *before* Godot's global class cache had ever seen the newly-created `route_manager.gd`/`save_data.gd` files, so every script referencing `RouteManager`/`SaveData` as a static type (`hud.gd`, `thrower.gd`, `results_screen.gd`, `route_manager.gd` itself) failed to parse mid-run. The save still completed, silently dropping several exported properties along the way (Thrower's `route_manager_path` never got set; some Player/CameraRig tunables got serialized as explicit defaults they used to omit). Godot's headless mode doesn't rebuild the class cache on its own the way opening the editor does — the fix was a `godot4 --headless --editor --quit-after 1` pass (forces a project scan that regenerates `global_script_class_cache.cfg`) before re-running the wiring script cleanly. Since the real M9 changes had already been committed by that point, discarding and redoing the broken save was a plain `git checkout --`.
+2. `RouteIntroUI`'s countdown label was only hidden via a `modulate.a` fade set in code, never an explicit `visible = false` — so before the route's first `state_changed` signal ever fires (i.e., the entire `IDLE` state, including the very first frame), the label sat at its scene-default `visible = true`, invisible only by chance (zero alpha) rather than by design. Caught by an explicit headless assertion ("Countdown hidden while IDLE"), not by eye. Fixed by setting `visible = false` in `_ready()` alongside the alpha reset.
+
+Verified with a headless scripted test driving the real `Playground` scene end-to-end: `RouteManager` starts `IDLE`, `start_route()` enters `COUNTDOWN`, transitions to `ACTIVE` with the bundle sized to exactly 5, a deliberate off-target throw refunds its newspaper without counting as a delivery, all 5 deliveries complete in the expected order, score lands on exactly 50, the results screen shows the correct score/deliveries/accuracy (83% — the test's one deliberate miss plus 5 hits), best score persists via `SaveData`, and `restart_route()` correctly re-enters `COUNTDOWN` — 26/26 assertions passed.
+
+In the real exported Web build, both a genuine keyboard session and a genuine touch session completed the full route end-to-end: a real mouse click (move+down+hold+up — a bare `page.mouse.click()` didn't reliably register against the Godot Web canvas, worth remembering for future Playwright tests against this project) started the route, real `F` keypresses (keyboard session) or real taps on the THROW button (touch session) threw each newspaper, and both reached Score: 50, 5/5 deliveries, the ROUTE COMPLETE screen with a correct "New Best!" best-score flourish, and a working Play Again back into `COUNTDOWN` — zero console errors either way. Both sessions used the temporary debug bridge's teleport escape hatch to skip only the BMX pathing between mailboxes; steering the bike competently isn't what this browser test is verifying (the headless test above already exhaustively covers the route logic, including a full completion with genuine physics-driven throws), and a crude scripted pursuit bot fighting a deliberately long ~40m traversal added test flakiness without adding coverage.
+
+### Next Session
+
+- The on-screen directional cue toward the active mailbox is still open (Milestone 7/8 carryover) — now more noticeable on the route's longest leg (Mailbox3 -> Mailbox5, ~40m).
+- Consider whether a second fixed route (reusing `RouteManager` as designed) is worth building before any progression/unlock system, once that's back in scope.
+
+---
+
 # Current Version
 
-v0.1.0-alpha (released) — Milestone 7 (First Neighborhood) merged to `main`. Milestone 8 (Game Feel) is complete on its own branch, awaiting review before merging.
+v0.1.0-alpha (released) — Milestone 8 (Game Feel) merged to `main`. Milestone 9 (The First Route) is complete on its own branch, awaiting review before merging.
 
 ---
 
@@ -314,6 +346,10 @@ v0.1.0-alpha (released) — Milestone 7 (First Neighborhood) merged to `main`. M
 - The neighborhood is a single straight street (no turns, intersections, or a second block yet) — the modular road/sidewalk/curb kit supports extending it, but no branching layout exists yet.
 - "Front lawn" is the existing grass ground plane reused everywhere road/sidewalk/driveway pieces don't cover, not a distinct piece of geometry — a deliberate simplification (this is a level-design milestone, not an art one), noted here in case future art wants dedicated lawn texturing/edging.
 - All 6 houses reuse the same placeholder art (only scale and facing vary) — no visual house variants yet.
+- There is only one fixed route (5 stops, the same order every run) — `RouteManager` supports any ordered list of mailboxes, but no second route or route-selection UI exists yet.
+- No pause/quit-mid-route option — once "START ROUTE" is pressed the only way back to `IDLE` is finishing the route (or reloading the page).
+- Audio (fanfare included) still procedurally-generated placeholder tone, per the existing audio note above — not mixed/mastered.
+- `page.mouse.click()` doesn't reliably register against this project's Godot Web canvas in headless Chromium/Playwright testing; an explicit move + mousedown + short hold + mouseup does. Purely a test-tooling note for future Playwright work against this repo, not a gameplay issue.
 
 ---
 

@@ -56,7 +56,7 @@ The objective is not to recreate any existing game, but to capture the freedom, 
 - [x] Score system
 - [ ] Obstacles
 - [x] UI
-- [ ] Audio
+- [x] Audio
 
 ---
 
@@ -268,9 +268,34 @@ Verified with a headless scripted test against the real `Playground` scene (old 
 
 ---
 
+## Day 8
+
+### Completed
+
+- Merged Milestone 7 (First Neighborhood) to `main`, confirmed CI + Pages deploy green, then built Milestone 8 ("Game Feel") on its own branch. No new mechanics — every change is tuning, feedback, or polish on the existing ride/throw/deliver loop, with every tunable value exported rather than hard-coded (including a couple of pre-existing hard-coded literals — `SquashStretch`'s jump feedback, `HUD`'s celebration tween — cleaned up along the way).
+- Bike feel: smoothed steering input, a small cosmetic cornering speed loss, a brake-dive pitch, and a continuous speed-scaled suspension bounce plus landing compression — all cheap per-frame math on `LeanPivot`, no tweens or allocations. Every landing now gives a little suspension "give"; a hard landing additionally still triggers the existing squash-stretch plus a new one-shot dust puff and thump sound.
+- Camera feel: subtle anticipation (leads slightly in the direction of travel), dynamic speed-based zoom, a very subtle turn tilt (derived from the target's own yaw rate, not from reaching into Player internals), and a brief landing impulse driven directly off `Player.landed` — the camera rig stays decoupled from Player's specific exports.
+- Throw feel: a brief windup between pressing throw and the newspaper actually launching (with an immediate anticipation squash and a whoosh synced to the real launch), a gentle apex-synced scale pulse on the newspaper's arc, a quick impact pop instead of an instant vanish, and mailboxes now visibly wobble on delivery.
+- Audio: three new procedurally-synthesized placeholder sounds (throw whoosh, landing thump, a seamlessly-looping ride hum whose volume/pitch track speed), plus a small random pitch variance on the existing delivery chime so repeated deliveries don't sound identical. Same synthesis-at-build-time technique as the original chime — no external assets.
+
+### Notes
+
+One real bug in the new wiring script, caught immediately by re-inspecting the saved scene rather than by a runtime crash: duplicating the existing `DustEmitter` node to create the new one-shot `LandingDust` used `duplicate(Node.DUPLICATE_USE_INSTANTIATION)` — passing that flag *alone* excludes Godot's default `DUPLICATE_SCRIPTS` flag, so the duplicate silently lost its script entirely. `player.gd` was already defensively checking `landing_dust.has_method("burst")` before calling it, so this would have failed silent (no dust, no error) rather than crashing — worth remembering that defensive `has_method()` guards can mask a real wiring mistake just as easily as they prevent a crash. Fixed by adding the script reference back explicitly.
+
+Draw calls were sampled at several points in the real Web build and ranged from 46 to 459 depending on camera facing — much wider than Milestone 7's single reported "135". Investigated to rule out a regression (compared node counts, checked screenshots for duplicated geometry) before concluding it's architectural: the neighborhood is one long, perfectly straight, unobstructed street (a Milestone 7 layout choice, already logged as a known limitation), so depending on which way the camera happens to be facing, it can see anywhere from one nearby house to the entire 60m corridor at once. This milestone added exactly one new draw call (the one-shot landing dust); everything else added was audio (zero rendering cost) or pure script logic. Worth revisiting if the street is ever extended significantly — a turn in the road, or simple distance-based culling/fog, would cap the worst case.
+
+Verified with a headless scripted test against the real `Playground` scene (acceleration, a nonzero suspension offset, lean reacting to cornering, brake-dive pitch, and a full ride-throw-deliver cycle — now including the windup — scoring correctly), and with the real exported Web build: both a genuine keyboard session and a genuine synthetic-touch session delivered successfully (Score: 10), zero console errors.
+
+### Next Session
+
+- A turn or second block in the street, both to break up the long sightline (draw calls, visual variety) and to give the modular kit its first real reuse test.
+- Revisit the on-screen directional cue toward the active mailbox — still open from Milestone 7.
+
+---
+
 # Current Version
 
-v0.1.0-alpha (released) — Milestone 6 (BMX) merged to `main`. Milestone 7 (First Neighborhood) is complete on its own branch, awaiting review before merging.
+v0.1.0-alpha (released) — Milestone 7 (First Neighborhood) merged to `main`. Milestone 8 (Game Feel) is complete on its own branch, awaiting review before merging.
 
 ---
 
@@ -282,9 +307,10 @@ v0.1.0-alpha (released) — Milestone 6 (BMX) merged to `main`. Milestone 7 (Fir
 - The camera has no dedicated look input by design (mobile controls are movement + jump only) — it auto-orients behind the player's facing direction. This matches the intended mobile-first UX but means there's currently no way to look around independently of moving.
 - Concurrent multitouch (dragging the joystick while tapping jump/throw) relies on Godot's native browser touch handling, which is well-established engine behavior; it was exercised sequentially in automated testing rather than via a hand-crafted concurrent synthetic touch sequence, since accurately simulating true concurrent multitouch through raw DOM events is significantly more complex than the engine behavior it would be verifying.
 - No on-screen indicator for *which direction* the active mailbox is when it's off-screen — the player currently has to explore/remember the map. The gold target ring is only visible once the mailbox is in view.
-- The delivery chime is a single procedurally-generated placeholder tone, not mixed/mastered audio.
+- All audio (delivery chime, throw whoosh, landing thump, ride hum) is procedurally-generated placeholder tone/noise, not mixed/mastered audio.
 - The BMX has no collision-based crash/fail state — riding into a house, tree, streetlight, or any other scenery just stops the bike against the obstacle rather than producing dedicated feedback (a bump animation, a sound, etc.).
 - The BMX's placeholder frame/wheel geometry is intentionally simple (primitive meshes matching the existing low-poly placeholder character) and not final bike art.
+- Draw calls swing widely (46-459 observed) depending on camera facing, since the neighborhood is one long unobstructed straight street — see Day 8 notes. Not a performance problem today, but worth addressing (a turn in the road, or distance culling/fog) if the street grows.
 - The neighborhood is a single straight street (no turns, intersections, or a second block yet) — the modular road/sidewalk/curb kit supports extending it, but no branching layout exists yet.
 - "Front lawn" is the existing grass ground plane reused everywhere road/sidewalk/driveway pieces don't cover, not a distinct piece of geometry — a deliberate simplification (this is a level-design milestone, not an art one), noted here in case future art wants dedicated lawn texturing/edging.
 - All 6 houses reuse the same placeholder art (only scale and facing vary) — no visual house variants yet.

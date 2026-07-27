@@ -9,6 +9,16 @@ extends Node3D
 @export var squash_duration: float = 0.08
 @export var recover_duration: float = 0.18
 
+@export_group("Jump Feedback")
+@export var jump_squash_scale: Vector3 = Vector3(0.85, 1.2, 0.85)
+@export var jump_squash_duration: float = 0.06
+@export var jump_recover_duration: float = 0.14
+
+@export_group("Throw Feedback")
+@export var throw_squash_scale: Vector3 = Vector3(1.18, 0.88, 1.08)
+@export var throw_squash_duration: float = 0.05
+@export var throw_recover_duration: float = 0.12
+
 var _tween: Tween
 
 
@@ -17,7 +27,11 @@ func play_landing_feedback() -> void:
 
 
 func play_jump_feedback() -> void:
-	_play_squash(Vector3(0.85, 1.2, 0.85), 0.06, 0.14)
+	_play_squash(jump_squash_scale, jump_squash_duration, jump_recover_duration)
+
+
+func play_throw_feedback() -> void:
+	_play_squash(throw_squash_scale, throw_squash_duration, throw_recover_duration)
 
 
 func _play_squash(target_scale: Vector3, squash_time: float, recover_time: float) -> void:

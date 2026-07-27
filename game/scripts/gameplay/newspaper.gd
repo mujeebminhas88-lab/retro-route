@@ -16,6 +16,11 @@ signal missed
 @export var spin_degrees_per_sec: float = 620.0
 @export var miss_lifetime: float = 0.6
 
+@export_group("Impact")
+@export var apex_stretch_amount: float = 0.25
+@export var impact_pop_scale: float = 1.6
+@export var impact_pop_duration: float = 0.1
+
 var _start: Vector3
 var _end: Vector3
 var _elapsed: float = 0.0
@@ -51,9 +56,14 @@ func _process(delta: float) -> void:
 	_elapsed += delta
 	var t := clampf(_elapsed / flight_duration, 0.0, 1.0)
 	var pos := _start.lerp(_end, t)
-	pos.y += sin(t * PI) * arc_height
+	var arc_t := sin(t * PI)
+	pos.y += arc_t * arc_height
 	global_position = pos
 	rotate_x(deg_to_rad(spin_degrees_per_sec) * delta)
+	# A gentle apex-synced scale pulse (not a directional stretch, which
+	# would fight the continuous spin visually) keeps the arc's peak — the
+	# hardest moment to judge hit/miss by eye — a touch more readable.
+	scale = Vector3.ONE * (1.0 + apex_stretch_amount * arc_t)
 
 	if t >= 1.0:
 		_finish()
@@ -63,8 +73,15 @@ func _finish() -> void:
 	_finished = true
 	if _is_hit:
 		delivered.emit(_target_mailbox)
-		queue_free()
+		_play_impact_and_free()
 	else:
 		missed.emit()
 		await get_tree().create_timer(miss_lifetime).timeout
 		queue_free()
+
+
+func _play_impact_and_free() -> void:
+	var tween := create_tween()
+	tween.tween_property(self, "scale", Vector3.ONE * impact_pop_scale, impact_pop_duration * 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "scale", Vector3.ZERO, impact_pop_duration * 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tween.tween_callback(queue_free)

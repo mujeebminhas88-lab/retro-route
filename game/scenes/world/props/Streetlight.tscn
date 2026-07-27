@@ -1,0 +1,37 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pntar"]
+albedo_color = Color(0.3, 0.3, 0.32, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_t3h7q"]
+top_radius = 0.06
+bottom_radius = 0.08
+height = 3.6
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1mqny"]
+size = Vector3(0.2, 3.6, 0.2)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0dmxe"]
+albedo_color = Color(0.95, 0.9, 0.6, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_26qmk"]
+radius = 0.22
+height = 0.4
+
+[node name="Streetlight" type="Node3D"]
+
+[node name="Body" type="StaticBody3D" parent="."]
+
+[node name="Pole" type="MeshInstance3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, 0)
+material_override = SubResource("StandardMaterial3D_pntar")
+mesh = SubResource("CylinderMesh_t3h7q")
+
+[node name="@CollisionShape3D@3" type="CollisionShape3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, 0)
+shape = SubResource("BoxShape3D_1mqny")
+
+[node name="Lamp" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.7, 0)
+material_override = SubResource("StandardMaterial3D_0dmxe")
+mesh = SubResource("SphereMesh_26qmk")

@@ -51,7 +51,7 @@ The objective is not to recreate any existing game, but to capture the freedom, 
 - [x] Player movement
 - [x] Camera system
 - [x] Bike controller
-- [ ] Basic neighborhood
+- [x] Basic neighborhood
 - [x] Delivery system
 - [x] Score system
 - [ ] Obstacles
@@ -240,9 +240,37 @@ Testing needed a different trick than previous milestones. The old camera-relati
 
 ---
 
+## Day 7
+
+### Completed
+
+- Merged Milestone 6 (BMX) to `main`, confirmed CI + Pages deploy green, then built Milestone 7 ("The First Neighborhood") on its own branch: replaced the prototype test playground with the first real suburban street.
+- Built a 13-piece reusable modular kit (`game/scenes/world/props/`) — road, sidewalk, and curb segments; a driveway; a road-marking dash; a tree; a bush; a streetlight; a telephone pole; a fire hydrant; a bench; a trash bin; a fence segment — all simple low-poly primitives in bright, flat, readable colors, matching the placeholder character's art style.
+- Assembled a straight two-sided street: 5 tiled road/sidewalk/curb segments (60m), a dashed yellow center line, 6 houses (3 per side) each with its own driveway, mailbox, and a bush, 6 trees, 4 streetlights, 2 telephone poles, 2 fire hydrants, a bench, 2 trash bins, and picket fences around the two front yards nearest spawn. Front lawns are just the existing grass ground plane — road/sidewalk/driveway pieces are thin non-colliding overlays on one continuous flat collision floor, so there's no seam anywhere the bike can get stuck, and no new collision complexity for the road network itself.
+- The whole neighborhood renders in **135 draw calls** in the real exported Web build — comfortably lightweight for mobile, with plenty of headroom before any instancing/batching optimization would be worth it.
+- Camera, gravity/jump/landing, and the entire delivery gameplay loop needed zero changes — `DeliveryManager` picked up all 6 new mailboxes automatically via the existing `"mailboxes"` group.
+
+### Notes
+
+Two real bugs surfaced while writing the headless builder script that assembles the neighborhood into `Playground.tscn` (load the scene, rebuild its dressing in code, re-save — the same pattern used for the Milestone 6 BMX scene rebuild):
+
+1. Recursively reassigning `owner` on an *instanced* sub-scene's internal children (e.g. a placed `Mailbox`'s `VisualRoot/Flag`) flattens and duplicates that scene's node tree when saved, instead of keeping it as a clean `instance=ExtResource(...)` reference — which corrupted `@onready $Path` lookups (`flag_mesh` came back null) the moment the scene was reloaded. The fix is narrower than it sounds: only the instance *root* should ever get its `owner` reassigned when placing it into an outer scene; its own descendants already belong to their own referenced scene and must be left alone.
+2. Godot readies sibling nodes in child-index order. The newly-appended `Mailbox` nodes ended up positioned after `DeliveryManager` in the tree (new nodes are appended; `DeliveryManager` kept its original earlier position from before the rebuild), so `DeliveryManager._ready()` — which immediately activates a mailbox — ran before that mailbox's own `_ready()` had resolved its child references, crashing on a null `flag_mesh`. Fixed by explicitly moving `DeliveryManager` to be the last child once the neighborhood is fully built.
+
+A third thing was a test-harness quirk, not a gameplay bug: inside a custom headless `SceneTree` test script, group membership (`get_nodes_in_group`) and anything that depends on other nodes' `_ready()` isn't reliably queryable synchronously inside `_init()` — it only settles by the first `_process()` frame. Structural assertions (mailbox count, house count) had to move from `_init()` into the first `_process()` tick. This doesn't affect the shipped game at all — the real Web build boots through Godot's normal scene-load flow, not a hand-rolled `add_child()` — but it's worth remembering for the next headless test, since it cost real debugging time here (same family of issue as the `get_tree().current_scene` quirk documented back in Milestone 5).
+
+Verified with a headless scripted test against the real `Playground` scene (old dressing gone, 6 houses/mailboxes present, 19+ meters of unobstructed riding, then a full ride-to-mailbox-and-throw scoring exactly 10), and with the real exported Web build: both a genuine keyboard session and a genuine synthetic-touch session rode through the neighborhood and delivered successfully (Score: 10), zero console errors, with screenshots confirming the road/sidewalk/houses/trees/streetlights/mailbox all read clearly from the follow camera.
+
+### Next Session
+
+- Consider a second neighborhood block or a turn in the road, now that the street kit is reusable.
+- Revisit the on-screen directional cue toward the active mailbox now that mailboxes are spread across 6 houses instead of 3 open-field targets.
+
+---
+
 # Current Version
 
-v0.1.0-alpha (released) — Milestone 6 "The BMX Begins" in progress on its own branch, not yet merged to `main`.
+v0.1.0-alpha (released) — Milestone 6 (BMX) merged to `main`. Milestone 7 (First Neighborhood) is complete on its own branch, awaiting review before merging.
 
 ---
 
@@ -255,8 +283,11 @@ v0.1.0-alpha (released) — Milestone 6 "The BMX Begins" in progress on its own 
 - Concurrent multitouch (dragging the joystick while tapping jump/throw) relies on Godot's native browser touch handling, which is well-established engine behavior; it was exercised sequentially in automated testing rather than via a hand-crafted concurrent synthetic touch sequence, since accurately simulating true concurrent multitouch through raw DOM events is significantly more complex than the engine behavior it would be verifying.
 - No on-screen indicator for *which direction* the active mailbox is when it's off-screen — the player currently has to explore/remember the map. The gold target ring is only visible once the mailbox is in view.
 - The delivery chime is a single procedurally-generated placeholder tone, not mixed/mastered audio.
-- The BMX has no collision-based crash/fail state — riding into the House or Cube props (or any scenery) just stops the bike against the obstacle rather than producing dedicated feedback (a bump animation, a sound, etc.). Fine for now since the neighborhood is still a gray-box test area, worth revisiting once real level geometry exists.
+- The BMX has no collision-based crash/fail state — riding into a house, tree, streetlight, or any other scenery just stops the bike against the obstacle rather than producing dedicated feedback (a bump animation, a sound, etc.).
 - The BMX's placeholder frame/wheel geometry is intentionally simple (primitive meshes matching the existing low-poly placeholder character) and not final bike art.
+- The neighborhood is a single straight street (no turns, intersections, or a second block yet) — the modular road/sidewalk/curb kit supports extending it, but no branching layout exists yet.
+- "Front lawn" is the existing grass ground plane reused everywhere road/sidewalk/driveway pieces don't cover, not a distinct piece of geometry — a deliberate simplification (this is a level-design milestone, not an art one), noted here in case future art wants dedicated lawn texturing/edging.
+- All 6 houses reuse the same placeholder art (only scale and facing vary) — no visual house variants yet.
 
 ---
 

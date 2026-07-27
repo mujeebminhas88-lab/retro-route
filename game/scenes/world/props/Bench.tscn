@@ -1,0 +1,45 @@
+[gd_scene load_steps=8 format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_yrb3g"]
+albedo_color = Color(0.5, 0.32, 0.18, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_8ivfh"]
+size = Vector3(1.4, 0.08, 0.5)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_paavp"]
+albedo_color = Color(0.5, 0.32, 0.18, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_sifrr"]
+size = Vector3(1.4, 0.5, 0.08)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ncuf7"]
+albedo_color = Color(0.25, 0.25, 0.27, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_vadfa"]
+size = Vector3(1.3, 0.42, 0.08)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_jd6ck"]
+size = Vector3(1.4, 0.9, 0.55)
+
+[node name="Bench" type="Node3D"]
+
+[node name="Body" type="StaticBody3D" parent="."]
+
+[node name="Seat" type="MeshInstance3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, 0)
+material_override = SubResource("StandardMaterial3D_yrb3g")
+mesh = SubResource("BoxMesh_8ivfh")
+
+[node name="Back" type="MeshInstance3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, -0.21)
+material_override = SubResource("StandardMaterial3D_paavp")
+mesh = SubResource("BoxMesh_sifrr")
+
+[node name="Legs" type="MeshInstance3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.21, 0.15)
+material_override = SubResource("StandardMaterial3D_ncuf7")
+mesh = SubResource("BoxMesh_vadfa")
+
+[node name="@CollisionShape3D@6" type="CollisionShape3D" parent="Body"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.45, -0.05)
+shape = SubResource("BoxShape3D_jd6ck")

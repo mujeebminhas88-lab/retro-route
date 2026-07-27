@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_x8y34"]
+albedo_color = Color(0.95, 0.85, 0.15, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_3wvmo"]
+size = Vector3(0.18, 0.01, 1.5)
+
+[node name="RoadMarkingDash" type="Node3D"]
+
+[node name="Dash" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.065, 0)
+material_override = SubResource("StandardMaterial3D_x8y34")
+mesh = SubResource("BoxMesh_3wvmo")

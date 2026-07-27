@@ -48,8 +48,8 @@ The objective is not to recreate any existing game, but to capture the freedom, 
 
 ## Alpha
 
-- [ ] Player movement
-- [ ] Camera system
+- [x] Player movement
+- [x] Camera system
 - [ ] Bike controller
 - [ ] Basic neighborhood
 - [ ] Delivery system
@@ -161,9 +161,36 @@ Two real issues surfaced and were resolved during validation:
 
 ---
 
+## Day 4
+
+### Completed
+
+- Built the first playable prototype: full third-person arcade locomotion (walk/run/accelerate/decelerate/momentum/air control), an arcade jump with variable height and landing detection, and a smooth auto-follow chase camera with collision avoidance.
+- Built the input abstraction (`PlayerInput`) so keyboard and on-screen touch controls are indistinguishable to the locomotion code — the same contract a future BMX controller will reuse.
+- Built the mobile touch UI from scratch (no external image assets): an analog virtual joystick and a round jump button, both drawn via `_draw()` and handling real multitouch by tracking pointer/touch index.
+- Added visual polish: placeholder capsule character with a facing indicator, a raycast blob shadow that fades with jump height, lightweight movement dust particles, and a squash/stretch landing bounce.
+- New main scene: `scenes/world/Playground.tscn`, replacing `TestScene.tscn` as `run/main_scene` (which is kept as-is for boot verification).
+- Deployed the milestone to the Web build pipeline built last session and verified it live.
+
+### Notes
+
+Two real bugs were caught and fixed during testing, both worth remembering:
+
+1. **Touch-coordinate scaling.** My first touch-simulation test appeared to do nothing — the joystick never activated. Root cause: the project's base viewport was still `1280x720` (landscape) from the foundation milestone, but this is a portrait, mobile-first game. Godot's `canvas_items` + `expand` stretch mode picks a uniform scale so the *narrower* base dimension matches the window, and expands the other logical dimension to fill the rest — on a portrait phone window against a landscape base, that inflated the logical canvas far beyond the window's real pixel size, so screen-space touch coordinates landed nowhere near the anchored UI. Fixed by swapping the base viewport to `720x1280` (portrait), which also fixed the touch controls rendering noticeably too small on-screen.
+2. **`Basis must be normalized` runtime error.** The player's facing rotation was applied by overwriting `visual_root.global_transform.basis` directly every frame, while the squash-stretch landing feedback animated the *same node's* `scale` — both features are ultimately stored in the same `transform.basis` matrix in Godot 4, so they fought each other and drifted out of orthonormality. Fixed by driving facing (and the camera rig's yaw) through a smoothed scalar angle applied via the dedicated `rotation.y` property instead of reassigning the whole basis, which composes cleanly with `scale` and can't drift.
+
+Testing methodology: rather than trust manual inspection, physics behavior was verified with headless SceneTree scripts that simulate real input and assert on position/velocity/state (gravity settle, camera-relative movement direction and speed, held-jump height vs. tap-jump height, landing state transitions). Touch controls were verified against the actual exported Web build using genuine synthetic `Touch`/`TouchEvent` objects dispatched at the canvas (not mouse emulation), with before/after screenshots as visual proof alongside a zero-console-error check.
+
+### Next Session
+
+- Build the first gray-box neighborhood block to replace the placeholder cube/house test dressing.
+- Begin planning the BMX locomotion variant that will replace (not discard) this milestone's movement tuning.
+
+---
+
 # Current Version
 
-v0.0.3 (Pre-Production — Continuous Deployment)
+v0.0.4 (Alpha — First Playable Prototype)
 
 ---
 
@@ -172,6 +199,8 @@ v0.0.3 (Pre-Production — Continuous Deployment)
 - No Android export templates or Android SDK installed in the current dev environment, so the Android export preset is untested end-to-end (project-side configuration only). Android is not yet part of the CI/CD pipeline.
 - Running the project under `--headless` (no GPU/display) logs a benign `mesh_get_surface_count` "Parameter m is null" error per `MeshInstance3D` — this is a known artifact of Godot's dummy rendering driver used for headless validation and does not occur with a real display/GPU or in the exported Web build (confirmed clean in an actual browser).
 - WASM multithreading is disabled in the Web export preset because GitHub Pages cannot serve the `Cross-Origin-Opener-Policy` / `Cross-Origin-Embedder-Policy` headers it requires. Not a problem today; would need Cloudflare Pages (or similar) if threading becomes necessary later.
+- The camera has no dedicated look input by design (mobile controls are movement + jump only) — it auto-orients behind the player's facing direction. This matches the intended mobile-first UX but means there's currently no way to look around independently of moving.
+- Concurrent multitouch (dragging the joystick while tapping jump) relies on Godot's native browser touch handling, which is well-established engine behavior; it was exercised sequentially in automated testing rather than via a hand-crafted concurrent synthetic touch sequence, since accurately simulating true concurrent multitouch through raw DOM events is significantly more complex than the engine behavior it would be verifying.
 
 ---
 

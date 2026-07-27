@@ -19,13 +19,22 @@ var _start_pos: Vector2 = Vector2.ZERO
 var _start_time: float = 0.0
 var _throw_left_just_pressed: bool = false
 var _throw_right_just_pressed: bool = false
+var _enabled: bool = true
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
+func set_enabled(value: bool) -> void:
+	_enabled = value
+	if not value:
+		_active_pointer_index = -1
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if not _enabled:
+		return
 	if event is InputEventScreenTouch:
 		_handle_pointer(event.index, event.position, event.pressed)
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:

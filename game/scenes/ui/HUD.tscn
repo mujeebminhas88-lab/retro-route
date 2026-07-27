@@ -24,7 +24,7 @@ offset_bottom = 112.0
 theme_override_font_sizes/font_size = 22
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 5
-text = "Deliveries: 0 / 5"
+text = "Deliveries: 0 / 20"
 
 [node name="NewspapersLabel" type="Label" parent="."]
 offset_left = 30.0

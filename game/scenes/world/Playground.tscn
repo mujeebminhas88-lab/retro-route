@@ -213,6 +213,7 @@ celebration_impulse_strength = 0.3
 [node name="TouchControls" type="CanvasLayer" parent="." instance=ExtResource("10_apvi5")]
 unique_name_in_owner = true
 script = ExtResource("11_5aurj")
+route_manager_path = NodePath("%RouteManager")
 
 [node name="HUD" type="CanvasLayer" parent="." instance=ExtResource("12_cy1fi")]
 unique_name_in_owner = true

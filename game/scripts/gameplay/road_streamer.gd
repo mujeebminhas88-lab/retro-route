@@ -37,26 +37,23 @@ var _started: bool = false
 
 func _ready() -> void:
 	if _route_manager:
-		_route_manager.route_started.connect(_on_route_started)
 		_route_manager.state_changed.connect(_on_state_changed)
 
 
 func _process(_delta: float) -> void:
-	if _started and _route_manager and _route_manager.state == RouteManager.State.ACTIVE:
+	if _started and _route_manager and _route_manager.state != RouteManager.State.IDLE:
 		_recycle_and_stream()
 
 
 func _on_state_changed(new_state: RouteManager.State) -> void:
-	if new_state == RouteManager.State.COUNTDOWN and _started:
-		_reset()
-
-
-func _on_route_started() -> void:
-	if not _started:
+	# Fill the world as soon as the countdown begins (not only once ACTIVE)
+	# so the player sees their starting street rather than bare ground
+	# while counting down -- also gives the countdown a visible purpose.
+	if new_state == RouteManager.State.COUNTDOWN:
+		if _started:
+			_reset()
 		_started = true
 		_fill_initial_blocks()
-	else:
-		_recycle_and_stream()
 
 
 func active_block_count() -> int:

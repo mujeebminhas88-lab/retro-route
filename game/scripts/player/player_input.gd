@@ -37,3 +37,11 @@ static func get_jump_held(touch_controls: Node) -> bool:
 	if touch_controls and touch_controls.has_method("is_jump_held"):
 		return touch_controls.is_jump_held()
 	return false
+
+
+static func get_throw_just_pressed(touch_controls: Node) -> bool:
+	if Input.is_action_just_pressed("throw"):
+		return true
+	if touch_controls and touch_controls.has_method("consume_throw_just_pressed"):
+		return touch_controls.consume_throw_just_pressed()
+	return false

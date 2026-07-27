@@ -1,0 +1,30 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/gameplay/newspaper.gd" id="1_rfawb"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_yj40w"]
+albedo_color = Color(0.92, 0.9, 0.8, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_h2wgl"]
+size = Vector3(0.26, 0.05, 0.18)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_kwed3"]
+albedo_color = Color(0.75, 0.2, 0.2, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ih2t1"]
+size = Vector3(0.27, 0.052, 0.05)
+
+[node name="Newspaper" type="Node3D"]
+script = ExtResource("1_rfawb")
+flight_duration = 0.5
+arc_height = 2.0
+spin_degrees_per_sec = 620.0
+miss_lifetime = 0.6
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+material_override = SubResource("StandardMaterial3D_yj40w")
+mesh = SubResource("BoxMesh_h2wgl")
+
+[node name="Stripe" type="MeshInstance3D" parent="."]
+material_override = SubResource("StandardMaterial3D_kwed3")
+mesh = SubResource("BoxMesh_ih2t1")

@@ -4,6 +4,23 @@ All notable changes to Retro Route will be documented in this file.
 
 ## [Unreleased]
 
+### Milestone: First Complete Gameplay Loop (Deliveries)
+
+- Added the delivery gameplay loop: throw newspapers at an auto-targeted active mailbox, score on hit, next mailbox activates automatically.
+- `game/scripts/gameplay/newspaper.gd` (`Newspaper`): kinematic (non-physics) arc projectile. Hit/miss is decided once at launch time from throw distance vs. a max range, not from runtime collision — deterministic, easy to follow, and cheap. `launch()` takes an explicit target position so a future manual-aim mode only changes target selection, not this class.
+- `game/scripts/gameplay/mailbox.gd` (`Mailbox`): delivery target with an active/inactive visual state (glowing bobbing flag + a gold ground target-ring reusing the Milestone 4 soft-circle texture), a `DeliveryPoint` marker, and a `play_delivered_feedback()` that reuses `SquashStretch` (from the player) plus a one-shot particle burst.
+- `game/scripts/gameplay/delivery_manager.gd` (`DeliveryManager`): single source of truth for score and the active-mailbox rotation. Discovers mailboxes via the `"mailboxes"` group (add a `Mailbox` to the scene and the group, no manual wiring needed), shuffles delivery order, and orchestrates score increment, floating "+10" popup, a procedurally-generated two-note success chime, and mailbox feedback on every delivery.
+- `game/scripts/gameplay/thrower.gd` (`Thrower`): a `Player` child node that reads the unified `PlayerInput.get_throw_just_pressed()` contract (same pattern as jump) and spawns a `Newspaper` toward `DeliveryManager.get_active_mailbox()`.
+- `game/scripts/effects/floating_popup.gd` (`FloatingPopup`): reusable world-space floating text (Label3D) that rises and fades, used for the "+10" score popup.
+- `game/scripts/ui/hud.gd` (`HUD`): minimal HUD — score label and a "Delivery Complete!" flash — purely reactive to `DeliveryManager` signals, no gameplay logic of its own.
+- Added a dedicated `throw` input action (keyboard `F`) and a third on-screen touch button (`THROW`, alongside `JUMP`), both routed through `PlayerInput`/`TouchControls` using the same contract pattern established for jump.
+- Added a visible newspaper stack prop near spawn and three `Mailbox` instances placed around the playground (`game/scenes/world/Playground.tscn`), each in the `"mailboxes"` group.
+- New scenes: `game/scenes/world/{Mailbox,Newspaper}.tscn`, `game/scenes/ui/{FloatingPopup,HUD}.tscn`; `game/scenes/ui/TouchControls.tscn` updated with the throw button.
+- Two real bugs found and fixed during testing:
+  1. `Thrower`/`DeliveryManager` spawned newspapers and score popups via `get_tree().current_scene`, which is only reliably set by Godot's normal scene-load flow — it was `null` in a headless test harness. Fixed by spawning as a sibling of the player / child of the delivery manager instead, which works regardless of how the scene was loaded.
+  2. The default throw range (7.0) put every mailbox already in range from the player's spawn point, trivializing the intended "walk to the target" loop. Reduced to 4.5, which requires real movement while staying comfortable once near the active mailbox.
+- Verified extensively: a headless scripted test asserts score stays 0 on a from-spawn miss, becomes exactly 10 on a close-range hit, and that a *different* mailbox becomes active afterward. In the real exported Web build, driven with genuine keyboard input, a full wander-and-throw session reached **Score: 10**; with genuine synthetic touch events (joystick + throw button), a sustained-direction session reached **Score: 30** (three deliveries) — both with **zero console/page errors**.
+
 ### Milestone: First Playable Prototype (Locomotion)
 
 - Built the player locomotion system as a reusable foundation (`game/scripts/player/player.gd`, class `Player`, `CharacterBody3D`): grounded walk/run with acceleration/deceleration/momentum, reduced-strength air control, camera-relative movement direction, and a small grounded/airborne state machine — designed so the planned BMX locomotion replaces the tuning values, not the architecture.

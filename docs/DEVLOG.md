@@ -52,10 +52,10 @@ The objective is not to recreate any existing game, but to capture the freedom, 
 - [x] Camera system
 - [ ] Bike controller
 - [ ] Basic neighborhood
-- [ ] Delivery system
-- [ ] Score system
+- [x] Delivery system
+- [x] Score system
 - [ ] Obstacles
-- [ ] UI
+- [x] UI
 - [ ] Audio
 
 ---
@@ -188,9 +188,38 @@ Testing methodology: rather than trust manual inspection, physics behavior was v
 
 ---
 
+## Day 5
+
+### Completed
+
+- Built the first complete gameplay loop: throw newspapers at an auto-targeted mailbox, deliver, score, next mailbox activates, repeat. This is the first genuinely *playable* (not just controllable) build.
+- Newspaper flight is deterministic and kinematic (sine-arc lerp, not physics) — hit/miss decided once at throw time from distance vs. range, which keeps delivery reliable and the arc easy to read, while still leaving room for manual aiming later (only the target-selection step would change).
+- `DeliveryManager` centralizes score and active-mailbox rotation; mailboxes only know how to look active/inactive and play their own bounce+particle feedback, keeping the pieces independently reusable.
+- Reused two Milestone 4 systems directly instead of writing new ones: `SquashStretch` for the mailbox's delivery bounce, and the soft-circle gradient texture for the mailbox's gold target ring (same technique as the ground shadow).
+- Added a third touch button (THROW) next to JUMP, and a `throw` keyboard action, both going through the same `PlayerInput` contract as jump.
+- Procedurally generated a short two-note success chime at build time (no external audio asset) for the delivery sound.
+
+### Notes
+
+Two real bugs surfaced during testing:
+
+1. `get_tree().current_scene` was `null` in a headless test harness (it's only set by Godot's normal scene-load flow, not by manually adding a scene under the root) — `Thrower` and `DeliveryManager` used it to spawn newspapers and score popups. Fixed by spawning relative to existing node references (the player's parent, the delivery manager itself) instead, which works regardless of how the scene was loaded — more robust in general, not just for tests.
+2. The default throw range (7.0) meant every mailbox was already in range from the player's spawn point — a throw would always succeed without ever moving, defeating the point of the loop. Caught by a headless test that expected a spawn-point throw to miss and got a hit instead. Tuned down to 4.5.
+
+Also confirmed (not a bug, just worth recording): holding a single non-forward direction (e.g. "left" alone) against the auto-follow camera causes the character to curve/spiral rather than travel in a straight line, because the camera continuously re-centers behind the player's changing facing while movement is interpreted relative to the camera. Holding "forward" alone is a stable straight line. This is an inherent property of the camera-relative auto-follow design approved in Milestone 4, not a defect — noted here because it shaped how the automated browser tests had to move the player (sustained mostly-forward drags beat alternating/circular sweeps).
+
+Testing: a headless scripted test asserts score stays 0 on a from-spawn miss, becomes exactly 10 on a close-range hit, and a different mailbox goes active afterward. In the real exported Web build: a keyboard-driven session (move + throw, no debugging aids) reached **Score: 10**; a touch-driven session (synthetic joystick drags + throw-button taps) reached **Score: 30** (three deliveries). Both had **zero console/page errors**.
+
+### Next Session
+
+- Build the first gray-box neighborhood block.
+- Consider a subtle on-screen directional cue (e.g. an off-screen arrow) toward the active mailbox now that there are three spread around the map — the gold target ring is only visible once it's in view.
+
+---
+
 # Current Version
 
-v0.0.4 (Alpha — First Playable Prototype)
+v0.0.5 (Alpha — First Complete Gameplay Loop)
 
 ---
 
@@ -200,7 +229,9 @@ v0.0.4 (Alpha — First Playable Prototype)
 - Running the project under `--headless` (no GPU/display) logs a benign `mesh_get_surface_count` "Parameter m is null" error per `MeshInstance3D` — this is a known artifact of Godot's dummy rendering driver used for headless validation and does not occur with a real display/GPU or in the exported Web build (confirmed clean in an actual browser).
 - WASM multithreading is disabled in the Web export preset because GitHub Pages cannot serve the `Cross-Origin-Opener-Policy` / `Cross-Origin-Embedder-Policy` headers it requires. Not a problem today; would need Cloudflare Pages (or similar) if threading becomes necessary later.
 - The camera has no dedicated look input by design (mobile controls are movement + jump only) — it auto-orients behind the player's facing direction. This matches the intended mobile-first UX but means there's currently no way to look around independently of moving.
-- Concurrent multitouch (dragging the joystick while tapping jump) relies on Godot's native browser touch handling, which is well-established engine behavior; it was exercised sequentially in automated testing rather than via a hand-crafted concurrent synthetic touch sequence, since accurately simulating true concurrent multitouch through raw DOM events is significantly more complex than the engine behavior it would be verifying.
+- Concurrent multitouch (dragging the joystick while tapping jump/throw) relies on Godot's native browser touch handling, which is well-established engine behavior; it was exercised sequentially in automated testing rather than via a hand-crafted concurrent synthetic touch sequence, since accurately simulating true concurrent multitouch through raw DOM events is significantly more complex than the engine behavior it would be verifying.
+- No on-screen indicator for *which direction* the active mailbox is when it's off-screen — the player currently has to explore/remember the map. The gold target ring is only visible once the mailbox is in view.
+- The delivery chime is a single procedurally-generated placeholder tone, not mixed/mastered audio.
 
 ---
 

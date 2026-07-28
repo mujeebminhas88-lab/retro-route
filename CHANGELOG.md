@@ -4,6 +4,37 @@ All notable changes to Retro Route will be documented in this file.
 
 ## [Unreleased]
 
+### Milestone: Mobile Arcade Controls & Streamed Route
+
+Redesigns the control scheme and route around what mobile testing of Milestone 9 surfaced as real problems: heading-based BMX steering could swerve/oversteer once the player stopped manually driving, auto-targeted throwing didn't give the player a clear sense of *where* a throw would go, and the fixed 5-mailbox route visibly ended. This milestone fixes those three things before any new obstacles, characters, weather, or progression get added — no new gameplay systems, just a more stable, predictable, mobile-first foundation.
+
+**Bike handling** (`game/scripts/player/player.gd`, full rewrite)
+- The bike now auto-cruises forward along a constant world axis (`auto_cruise_speed`) and never rotates its heading. LEFT/RIGHT is a smoothed *lateral strafe* (`max_lateral_speed`, `steering_response`, `steering_return_response`), not a turn — this is a deliberate departure from Milestone 6-9's heading-based steering, which is exactly what could swerve unpredictably once the player wasn't the one choosing when to accelerate.
+- Steering authority is reduced automatically as forward speed approaches cruise (`high_speed_steering_reduction`) and opens back up under braking — "limit excessive steering at high speed" expressed directly rather than as a side effect of some other formula.
+- A soft-then-hard lateral bound (`lateral_bounds`, `lateral_correction_margin`, `lateral_correction_strength`) means the player can never ride off the playable corridor, reading as a gentle correction rather than an invisible wall.
+- A constant, never-rotating forward axis has a second effect beyond stability: the rider's left/right and world -X/+X are identical by construction, so a throw's direction literally cannot be reversed by camera angle, tilt, or steering — there's nothing left to reverse it.
+- A lightweight, currently-inert boost hook (`boost_speed_multiplier`, `is_boosting`) is wired into the speed calculation for a future milestone to use without touching the movement math again.
+
+**Mobile controls** (`game/scripts/ui/touch_controls.gd`, `touch_button.gd`, new `swipe_throw_gesture.gd`; `virtual_joystick.gd` removed)
+- The virtual joystick is gone. Three large hold buttons — LEFT (bottom-left), BRAKE (bottom-center), RIGHT (bottom-right) — sit across the bottom of the screen with generous spacing, easy to reach with both thumbs.
+- Newspaper throwing moved off a button entirely, onto a full-screen directional swipe: swipe left throws left, swipe right throws right. `SwipeThrowGesture` listens via `_unhandled_input` specifically so a touch that started on a movement button never also reads as a swipe.
+- Keyboard equivalents: A/D or arrow keys to steer (reusing the existing `move_left`/`move_right` actions), S/Down to brake (`move_back`), and new `throw_left`/`throw_right` actions bound to Q/E.
+- All mobile controls are only active while the route is `ACTIVE` — found during testing that leaving them live during `IDLE`/`COUNTDOWN` let the bottom-center BRAKE button silently eat clicks meant for the START ROUTE button occupying the same screen region (see Notes).
+
+**Streamed route** (new `road_streamer.gd`, new `NeighborhoodBlock.tscn`)
+- `RoadStreamer` spawns a repeating 24m `NeighborhoodBlock` ahead of the player and recycles (frees) blocks once they're far enough behind — the active block count stays bounded (6 in practice: `blocks_ahead` + `blocks_behind`) no matter how long a route runs, and the road never visibly ends.
+- The single ground plane was enlarged (4000x4000) rather than streamed — one big static plane is far simpler than streaming collision floor tiles and is effectively free, so only the decorative/collidable neighborhood dressing needs to stream.
+- Each block places a real `Mailbox` on both sides for visual consistency, but only registers one (alternating, for fairness) with `RouteManager` as an actual deliverable target per block — the other sits inert, exactly like 5 of 6 mailboxes already looked throughout Milestones 7-9.
+- World population now starts the instant `COUNTDOWN` begins (not `ACTIVE`), so the player sees their starting street while counting down instead of bare ground — giving the countdown a visible purpose beyond just blocking input.
+
+**Route completion** (`game/scripts/gameplay/route_manager.gd`, substantial rewrite)
+- Mailboxes are no longer a fixed pre-placed list; `RouteManager.register_mailbox()` is called dynamically by `RoadStreamer` as each one is placed, and queued/activated in arrival order. Route completion is now a delivery **count** (`delivery_target = 20`) instead of "reached the end of the list," since a streamed route has no fixed end.
+- A mailbox the player rides well past without delivering is automatically skipped (`mailbox_skip_margin`) so a missed/ignored mailbox can never permanently stall progress toward the target.
+- The newspaper bundle is now generously padded (`bundle_padding = 500`) rather than exactly-sized — a streamed route has no fixed length to size it against, so supply is effectively unlimited across a normal run while keeping the exact same consume/refund-on-miss mechanic proven in Milestone 9.
+- Results screen, score, accuracy, time, and best-score behavior are all unchanged from Milestone 9 — only what "the route" means changed underneath them.
+
+**Testing**: a headless scripted test drives the real `Playground` scene end-to-end — confirms the player has zero horizontal velocity while `IDLE`/`COUNTDOWN` even with steer input held, `RoadStreamer` already has active blocks by the time `COUNTDOWN` starts, auto-forward begins exactly at `ACTIVE`, holding LEFT steers laterally and releasing lets it settle back toward zero, BRAKE slows the bike and releasing recovers cruise speed, a full 20-delivery run completes with an even 10/10 left/right split (score 200, best score persisted), `restart_route()` re-enters `COUNTDOWN` with the block count still bounded — 23/23 assertions passed. In the real exported Web build, a genuine keyboard session (real click on START ROUTE, real A/D/S/Q/E input) completed the full 20-delivery route (Score: 200, ROUTE COMPLETE, working Play Again) with zero console errors; a genuine touch session confirmed LEFT/BRAKE/RIGHT all respond correctly to real held touches (matching keyboard's steer/brake behavior) and confirmed the swipe gesture's distance/direction detection and delivery pipeline are correct, though a full touch-only 20-delivery run could not be completed inside this specific CDP-automation harness due to an input-timing quirk unrelated to the shipped game (see docs/DEVLOG.md).
+
 ### Milestone: The First Route
 
 The sandbox becomes the game's first complete playable session: spawn, a "START ROUTE" prompt, a 3-2-1-GO! countdown, a fixed 5-mailbox route delivered in a taught order, a results screen, and Play Again. No new mechanics beyond the route itself — traffic, pedestrians, shops, unlocks, progression, coins, weather, multiplayer, and new neighborhoods are explicitly out of scope for this milestone.

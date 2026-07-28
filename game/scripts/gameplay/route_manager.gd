@@ -180,6 +180,15 @@ func _check_skip_passed_mailbox() -> void:
 
 
 func _on_delivered(mailbox: Node3D) -> void:
+	if mailbox != _active_mailbox:
+		# A second throw was already in flight toward this mailbox when
+		# the first one landed and delivered it (rapid-fire throwing at
+		# the same still-active target) -- this one is stale. Treat it
+		# like a miss (refund the newspaper) rather than double-crediting
+		# a single mailbox for two throws.
+		_on_missed()
+		return
+
 	_hits_made += 1
 	score += points_per_delivery
 	score_changed.emit(score)
@@ -193,8 +202,7 @@ func _on_delivered(mailbox: Node3D) -> void:
 	_spawn_score_popup(mailbox)
 	_play_delivery_sound(mailbox)
 
-	if mailbox == _active_mailbox:
-		_active_mailbox = null
+	_active_mailbox = null
 
 	if _deliveries_completed >= delivery_target:
 		_complete_route()

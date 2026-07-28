@@ -10,13 +10,21 @@ extends Control
 ## exactly the property this relies on.
 
 @export var min_swipe_distance: float = 60.0
-@export var max_swipe_duration: float = 0.6
+@export var max_swipe_duration: float = 0.8
 
 const MOUSE_POINTER_INDEX := -2
 
 var _active_pointer_index: int = -1
 var _start_pos: Vector2 = Vector2.ZERO
-var _start_time: float = 0.0
+## Accumulated via _process(delta) while a pointer is held, rather than
+## differencing two Time.get_ticks_msec() timestamps -- the latter can
+## read as wildly inflated when the press/release pair arrives through
+## certain synthetic input pipelines (observed under CDP-driven browser
+## automation specifically), even though delta-based accumulation
+## elsewhere (Player's own movement) tracks real elapsed time correctly
+## in the exact same circumstances. Frame-accumulated duration ties this
+## measurement to the same clock the rest of gameplay already trusts.
+var _hold_duration: float = 0.0
 var _throw_left_just_pressed: bool = false
 var _throw_right_just_pressed: bool = false
 var _enabled: bool = true
@@ -24,6 +32,11 @@ var _enabled: bool = true
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+func _process(delta: float) -> void:
+	if _active_pointer_index != -1:
+		_hold_duration += delta
 
 
 func set_enabled(value: bool) -> void:
@@ -46,15 +59,14 @@ func _handle_pointer(index: int, pos: Vector2, pressed: bool) -> void:
 		if _active_pointer_index == -1:
 			_active_pointer_index = index
 			_start_pos = pos
-			_start_time = Time.get_ticks_msec() / 1000.0
+			_hold_duration = 0.0
 	elif index == _active_pointer_index:
 		_active_pointer_index = -1
 		_evaluate_swipe(pos)
 
 
 func _evaluate_swipe(end_pos: Vector2) -> void:
-	var duration := (Time.get_ticks_msec() / 1000.0) - _start_time
-	if duration > max_swipe_duration:
+	if _hold_duration > max_swipe_duration:
 		return
 	var delta := end_pos - _start_pos
 	if absf(delta.x) < min_swipe_distance:

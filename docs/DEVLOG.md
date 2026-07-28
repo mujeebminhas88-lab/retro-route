@@ -325,6 +325,30 @@ In the real exported Web build, both a genuine keyboard session and a genuine to
 
 ---
 
+## Day 11
+
+### Completed
+
+Milestone 10.1 ("Mobile Stability & Delivery Reliability") — a stabilization pass in response to a real-device playtest report that Milestone 10 "runs glitchy," with mailboxes appearing too close together, rapid swipes failing to register, and throws sometimes producing no delivery. No new gameplay this session; the brief was explicit that automated tests passing doesn't mean the game feels reliable, and to audit the actual implementation rather than assume a cause. Full root-cause list, fixes, and testing are in CHANGELOG.md; this entry covers the investigation process and what didn't make the cut.
+
+### Notes
+
+Started with a static read-through of the whole delivery/streaming/input pipeline (`road_streamer.gd`, `route_manager.gd`, `thrower.gd`, `swipe_throw_gesture.gd`, `touch_button.gd`, `hud.gd`, `mailbox.gd`) rather than jumping to a fix. That read alone surfaced most of the real bugs before any testing: the route-start skip-flicker and the near-zero first-reaction-time mailbox both fall directly out of the interaction between `blocks_behind` (pre-spawned for visual continuity) and mailbox registration happening on every block; the silent-miss gap was confirmed with a single grep (`delivery_missed` had no listeners anywhere); the swipe multitouch drop and the skip-margin-vs-in-flight-hit race were both found by tracing what happens when two things overlap in time that the original code implicitly assumed wouldn't.
+
+Performance was the one area where static reading wasn't enough to be confident, so it got measured rather than guessed at twice. First attempt: a browser-side `requestAnimationFrame` recorder over a ~95s ride. Useless as a *diagnostic* — the sandbox's software-WebGL fallback (`--use-gl=swiftshader`, confirmed via a console warning) was so slow on its own (mean ~545ms/frame) that it swamped any smaller structural signal from block spawning. Second attempt: moved the measurement inside the engine (`_process(delta)` + `get_tree().get_node_count()` logged every frame, read back from JS via `JavaScriptBridge.eval`), which at least confirmed the streamed set stays bounded (node count flattens at ~603-606 after the initial fill and never climbs further over the rest of a long run) but still found no statistically distinct spike correlated with spawn events — the software-rendering floor was still too dominant relative to whatever a spawn actually costs. Third attempt, and the one that actually answered the question: dropped the browser entirely and timed `NeighborhoodBlock.tscn.instantiate()` directly in native headless Godot, isolated from all rendering. Mean 0.70ms, p95 0.83ms, max 3.9ms per instantiate — cheap next to any real frame budget, even generously discounting for WASM being several times slower than native. Concluded block-spawn instantiation is not a supported root cause and did not implement the block-pooling optimization that had been the leading hypothesis going in; the brief's instruction against unjustified changes applies to performance work exactly as much as it does to a new cooldown or a new feature.
+
+All fixes were verified two ways: a new temporary headless test script (16 assertions: no start-flicker, mailbox spacing, the in-flight-hit-vs-skip race surviving a simulated skip, overlapping-touch multitouch tracked and resolved independently, and a full 20-delivery run driven end-to-end through the real streaming pipeline with bounded block count) driving the actual `Playground` scene rather than isolated unit logic, then a real Web export exercised with Playwright: a full keyboard route through all 20 deliveries to the results screen, Play Again, and a CDP two-finger overlapping-touch sequence (one swipe held open while a second, different-direction swipe starts and completes before the first releases) specifically targeting the exact race the multitouch fix closes.
+
+The newspaper-into-mailbox docking animation the brief raised (Phase 6) was deliberately scoped down rather than skipped silently: the `DeliveryPoint` marker was moved from just outside the mailbox's collision box to inside it (a one-line transform change, low risk), but a real "flap opens, newspaper settles in" animation would touch Newspaper's flight/impact code more substantially than felt appropriate to combine with a stability-focused pass — flagged as a good scope for its own short milestone once this one is confirmed solid on a real phone.
+
+### Next Session
+
+- Get this build in front of an actual phone, not just headless-Chromium/CDP automation — every fix here was verified as thoroughly as this environment allows, but real touch hardware, real GPU rendering, and real network conditions are the only way to confirm the original "glitchy" report is actually resolved rather than just its known causes being fixed.
+- If real-device testing still shows periodic stutter after this pass, revisit the `thread_support=false` Web export setting and the block-pooling idea shelved this session — the instantiate-cost measurement ruled it out as a *root cause* here, but a genuinely underpowered phone is a different environment than this sandbox's cloud CPU.
+- The newspaper docking/flap-open animation (Phase 6 of the M10.1 brief) is still open — scoped down to a marker-position fix this session, see CHANGELOG.md.
+
+---
+
 ## Day 10
 
 ### Completed
@@ -359,7 +383,7 @@ In the real exported Web build: a genuine keyboard session (real click on START 
 
 # Current Version
 
-v0.1.0-alpha (released) — Milestone 9 (The First Route) merged to `main`. Milestone 10 (Mobile Arcade Controls & Streamed Route) is complete on its own branch, awaiting review before merging.
+v0.1.0-alpha (released) — Milestone 9 (The First Route) merged to `main`. Milestone 10 (Mobile Arcade Controls & Streamed Route) is merged to `main` and deployed. Milestone 10.1 (Mobile Stability & Delivery Reliability) is complete on its own stabilization branch, awaiting review before merging — Milestone 10 was found to have real-device reliability issues after deployment; see Day 11.
 
 ---
 
@@ -380,6 +404,9 @@ v0.1.0-alpha (released) — Milestone 9 (The First Route) merged to `main`. Mile
 - The mobile control surface (LEFT/BRAKE/RIGHT + swipe) is disabled outside the `ACTIVE` state by design (see Day 10 notes) — this is required to avoid the BRAKE/START-ROUTE click conflict, but also means a player can't "practice" the controls before the countdown finishes.
 - `page.mouse.click()` doesn't reliably register against this project's Godot Web canvas in headless Chromium/Playwright testing; an explicit move + mousedown + short hold + mouseup does (established in Milestone 9, still true).
 - CDP-synthesized touch/mouse events (`Input.dispatchTouchEvent` via headless Chromium automation) can produce wildly inflated `Time.get_ticks_msec()` duration readings when sampled inside custom input-event handlers, even though the same engine's `_process`/`_physics_process` delta-time accumulation tracks real elapsed time correctly throughout the same session — this blocked a fully-automated touch-only 20-delivery test run in this specific harness (see Day 10 notes). `SwipeThrowGesture` was rewritten to measure duration via frame-accumulated `delta` instead specifically to avoid depending on the affected mechanism; not expected to affect real touch devices, whose input isn't CDP-synthesized.
+- (Milestone 10.1) Widening mailbox spacing to fix reaction-time pacing means a full 20-delivery route now covers roughly 2x the distance/time it did at Milestone 10's launch (~960m / ~2.5 minutes at cruise speed instead of ~480m / ~75s) — an intended consequence of the pacing fix, not a bug, but worth knowing if comparing session lengths against earlier playtest notes.
+- (Milestone 10.1) The newspaper-into-mailbox docking/flap-open animation raised in the M10.1 stabilization brief was deliberately deferred rather than attempted alongside the stability fixes — only the delivery marker's position was corrected (now inside the mailbox's collision box instead of just outside it). A real docking animation touches Newspaper's flight/impact code more substantially and is better scoped as its own short pass.
+- (Milestone 10.1) All fixes in this pass were verified via headless scripted tests and Web-export Playwright/CDP automation, per this environment's established testing capability — none of it is a substitute for hands-on testing on a real phone, which is what actually reported Milestone 10's "glitchy" issue in the first place. Real-device confirmation of this stabilization pass is still outstanding.
 
 ---
 

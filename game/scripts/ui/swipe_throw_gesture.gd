@@ -8,26 +8,33 @@ extends Control
 ## skips _unhandled_input entirely for any event a button already
 ## claimed via set_input_as_handled() during the _input phase, which is
 ## exactly the property this relies on.
+##
+## Milestone 10.1: tracks every concurrent pointer (a Dictionary keyed by
+## touch index), not just one. The previous single-`int` tracker silently
+## dropped a second finger's whole gesture -- press *and* eventual
+## release -- if it began before the first finger's release had been
+## processed. On a phone doing fast alternating throws (or simply
+## holding a control with one hand while swiping with the other), two
+## touches overlapping in time is normal, not an edge case, so this was
+## a real "rapid swipes fail to register" bug, not just a theoretical one.
 
 @export var min_swipe_distance: float = 60.0
 @export var max_swipe_duration: float = 0.8
 
 const MOUSE_POINTER_INDEX := -2
 
-var _active_pointer_index: int = -1
-var _start_pos: Vector2 = Vector2.ZERO
-## Accumulated via _process(delta) while a pointer is held, rather than
-## differencing two Time.get_ticks_msec() timestamps -- the latter can
-## read as wildly inflated when the press/release pair arrives through
-## certain synthetic input pipelines (observed under CDP-driven browser
-## automation specifically), even though delta-based accumulation
-## elsewhere (Player's own movement) tracks real elapsed time correctly
-## in the exact same circumstances. Frame-accumulated duration ties this
-## measurement to the same clock the rest of gameplay already trusts.
-var _hold_duration: float = 0.0
+## index -> { start_pos: Vector2, hold_duration: float }
+var _tracked_pointers: Dictionary = {}
 var _throw_left_just_pressed: bool = false
 var _throw_right_just_pressed: bool = false
 var _enabled: bool = true
+
+## Briefly true right after a completed gesture is rejected (too slow,
+## too short, or too vertical) -- a self-contained visual pulse so a
+## deliberate swipe that just missed the threshold reads as "didn't
+## register, try again" rather than silently nothing happening at all.
+var _reject_flash: float = 0.0
+const REJECT_FLASH_DURATION := 0.18
 
 
 func _ready() -> void:
@@ -35,14 +42,17 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if _active_pointer_index != -1:
-		_hold_duration += delta
+	for state in _tracked_pointers.values():
+		state.hold_duration += delta
+	if _reject_flash > 0.0:
+		_reject_flash = maxf(_reject_flash - delta, 0.0)
+		queue_redraw()
 
 
 func set_enabled(value: bool) -> void:
 	_enabled = value
 	if not value:
-		_active_pointer_index = -1
+		_tracked_pointers.clear()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -56,27 +66,36 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _handle_pointer(index: int, pos: Vector2, pressed: bool) -> void:
 	if pressed:
-		if _active_pointer_index == -1:
-			_active_pointer_index = index
-			_start_pos = pos
-			_hold_duration = 0.0
-	elif index == _active_pointer_index:
-		_active_pointer_index = -1
-		_evaluate_swipe(pos)
+		_tracked_pointers[index] = { "start_pos": pos, "hold_duration": 0.0 }
+	elif _tracked_pointers.has(index):
+		var state: Dictionary = _tracked_pointers[index]
+		_tracked_pointers.erase(index)
+		_evaluate_swipe(state.start_pos, state.hold_duration, pos)
 
 
-func _evaluate_swipe(end_pos: Vector2) -> void:
-	if _hold_duration > max_swipe_duration:
+func _evaluate_swipe(start_pos: Vector2, hold_duration: float, end_pos: Vector2) -> void:
+	if hold_duration > max_swipe_duration:
+		_reject()
 		return
-	var delta := end_pos - _start_pos
-	if absf(delta.x) < min_swipe_distance:
-		return
-	if absf(delta.x) < absf(delta.y):
+	var delta := end_pos - start_pos
+	if absf(delta.x) < min_swipe_distance or absf(delta.x) < absf(delta.y):
+		_reject()
 		return
 	if delta.x < 0.0:
 		_throw_left_just_pressed = true
 	else:
 		_throw_right_just_pressed = true
+
+
+func _reject() -> void:
+	_reject_flash = REJECT_FLASH_DURATION
+	queue_redraw()
+
+
+func _draw() -> void:
+	if _reject_flash > 0.0:
+		var alpha := 0.12 * (_reject_flash / REJECT_FLASH_DURATION)
+		draw_rect(Rect2(Vector2.ZERO, size), Color(1, 1, 1, alpha))
 
 
 func consume_throw_left_just_pressed() -> bool:

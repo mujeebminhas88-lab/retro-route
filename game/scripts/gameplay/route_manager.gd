@@ -56,6 +56,19 @@ var state: State = State.IDLE
 
 var _active_mailbox: Node3D = null
 var _pending_mailboxes: Array[Node3D] = []
+## Counts hit-labeled newspapers that are still mid-flight (Thrower
+## decides hit/miss the instant a throw is released, but the newspaper
+## takes flight_duration to actually land). Without this, a correctly
+## thrown newspaper could still lose its delivery: if the player kept
+## riding during that ~0.5s flight and crossed mailbox_skip_margin before
+## the newspaper landed, _check_skip_passed_mailbox() would already have
+## deactivated the target and moved on, so the eventual delivered signal
+## would arrive for a mailbox that's no longer _active_mailbox and get
+## treated as a stale miss -- a genuinely correct, well-timed throw
+## silently failing. Pausing the skip check while any hit is still
+## resolving closes that window; the stall risk is bounded by a single
+## newspaper's flight_duration, negligible next to mailbox_skip_margin.
+var _pending_hit_count: int = 0
 var _deliveries_completed: int = 0
 var _throws_made: int = 0
 var _hits_made: int = 0
@@ -118,6 +131,14 @@ func get_active_mailbox() -> Node3D:
 	return _active_mailbox if state == State.ACTIVE else null
 
 
+## Called by Thrower the instant it commits to a hit (before the
+## newspaper has actually landed) so the skip-margin safety net can't
+## pull the target out from under an already-correct throw. See
+## _pending_hit_count's doc comment.
+func notify_hit_committed() -> void:
+	_pending_hit_count += 1
+
+
 ## Called by RoadStreamer (or any future mailbox spawner) as each new
 ## mailbox is placed into the world. Queued in arrival order; if there's
 ## no currently active mailbox, this one (or the front of the queue)
@@ -150,6 +171,7 @@ func _begin_active() -> void:
 	_route_time = 0.0
 	_newspapers_remaining = delivery_target + bundle_padding
 	_active_mailbox = null
+	_pending_hit_count = 0
 
 	state_changed.emit(state)
 	score_changed.emit(score)
@@ -173,6 +195,8 @@ func _activate_next_if_needed() -> void:
 func _check_skip_passed_mailbox() -> void:
 	if not _active_mailbox or not _player:
 		return
+	if _pending_hit_count > 0:
+		return
 	if _player.global_position.z < _active_mailbox.global_position.z - mailbox_skip_margin:
 		_active_mailbox.set_active(false)
 		_active_mailbox = null
@@ -180,6 +204,8 @@ func _check_skip_passed_mailbox() -> void:
 
 
 func _on_delivered(mailbox: Node3D) -> void:
+	_pending_hit_count = maxi(_pending_hit_count - 1, 0)
+
 	if mailbox != _active_mailbox:
 		# A second throw was already in flight toward this mailbox when
 		# the first one landed and delivered it (rapid-fire throwing at

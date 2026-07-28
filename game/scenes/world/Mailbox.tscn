@@ -90,7 +90,7 @@ material_override = SubResource("StandardMaterial3D_ry06i")
 mesh = SubResource("BoxMesh_x306m")
 
 [node name="DeliveryPoint" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, -0.22)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, -0.09)
 
 [node name="TargetRing" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 0.03, 0)

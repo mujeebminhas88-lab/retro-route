@@ -11,20 +11,45 @@ extends Node3D
 ## Each block is expected to expose unique-named `%LeftMailbox` and
 ## `%RightMailbox` nodes (both real Mailbox instances, kept for visual
 ## consistency even when not the one currently deliverable). This
-## streamer decides, per block, which single side actually gets
-## registered with RouteManager as a deliverable target this pass,
-## alternating so both sides get fair, roughly even use.
+## streamer decides which blocks actually get a mailbox registered with
+## RouteManager as a deliverable target, alternating sides so both get
+## fair, roughly even use.
 ##
 ## Blocks are indexed along the player's forward travel distance
 ## (always -Z; see player.gd) rather than raw world Z, so the math here
 ## doesn't need to know or care which way "forward" happens to be.
-
+##
+## Milestone 10.1: only every `mailbox_spacing_blocks`'th block ahead of
+## the start line gets a registered (deliverable) mailbox -- registering
+## one on *every* block gave no gap between delivery opportunities, and
+## worse, the `blocks_behind` blocks pre-spawned for visual continuity
+## behind the player's spawn point were being queued too, so the first
+## two "deliveries" of every run activated and were instantly
+## auto-skipped (RouteManager's mailbox_skip_margin) within the first
+## couple of frames -- a visible flag-color flicker for zero player
+## opportunity, immediately followed by a real first mailbox only ~1.6m
+## ahead of the spawn line (near-zero reaction time). Requiring
+## `index > 0` removes every behind-spawn and start-line block from
+## consideration entirely, and the spacing multiple pushes the first
+## real target out to a full reaction-time distance.
 @export var block_scene: PackedScene
 @export var block_length: float = 24.0
 @export var blocks_ahead: int = 4
 @export var blocks_behind: int = 2
 @export var route_manager_path: NodePath
 @export var player_path: NodePath
+
+## Gameplay-based pacing, not an arbitrary number: at the bike's cruise
+## speed (6.5 m/s, see player.gd's auto_cruise_speed) two blocks is
+## 48m / ~7.4s between delivery opportunities -- enough time to see the
+## mailbox appear, read which side it's on, drift the bike into
+## position, throw, and watch the result resolve (newspaper flight_duration
+## 0.5s + hit_z_tolerance's ~5m/0.8s window) before the next one is even
+## visible. Braking only ever slows the bike below cruise speed, so this
+## spacing is the worst case, never a tighter one. 1 = a mailbox on every
+## block (Milestone 10's original crowded pacing); raise for a more
+## relaxed route.
+@export var mailbox_spacing_blocks: int = 2
 
 @onready var _route_manager: RouteManager = get_node_or_null(route_manager_path)
 @onready var _player: Node3D = get_node_or_null(player_path)
@@ -97,10 +122,16 @@ func _spawn_block(index: int) -> void:
 	block.position = Vector3(0.0, 0.0, -float(index) * block_length)
 	_active_blocks.append(block)
 
-	var mailbox: Node = block.get_node_or_null("%LeftMailbox" if _next_side_is_left else "%RightMailbox")
-	_next_side_is_left = not _next_side_is_left
-	if mailbox and _route_manager:
-		_route_manager.register_mailbox(mailbox)
+	# index > 0 excludes both the blocks_behind visual-continuity blocks
+	# (index < 0) and the start-line block itself (index 0, only ~1.6m
+	# ahead of spawn -- no meaningful reaction time) from ever becoming a
+	# delivery target; the spacing multiple then paces every target after
+	# that at a full reaction-time distance apart.
+	if index > 0 and index % mailbox_spacing_blocks == 0:
+		var mailbox: Node = block.get_node_or_null("%LeftMailbox" if _next_side_is_left else "%RightMailbox")
+		_next_side_is_left = not _next_side_is_left
+		if mailbox and _route_manager:
+			_route_manager.register_mailbox(mailbox)
 
 
 func _reset() -> void:

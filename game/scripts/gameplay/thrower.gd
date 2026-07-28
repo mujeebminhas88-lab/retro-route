@@ -56,6 +56,7 @@ func _throw(side: int) -> void:
 		hit = same_side and within_range
 		if hit:
 			end = target_mailbox.get_delivery_point() if target_mailbox.has_method("get_delivery_point") else target_mailbox.global_position
+			_route_manager.notify_hit_committed()
 
 	var newspaper: Newspaper = NEWSPAPER_SCENE.instantiate()
 	_player.get_parent().add_child(newspaper)

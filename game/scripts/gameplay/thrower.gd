@@ -1,25 +1,26 @@
 class_name Thrower
 extends Node
 
-## Directional swipe/keypress throwing (Milestone 10). A left throw
-## always launches toward world -X, a right throw toward world +X --
-## because Player's forward is a constant world -Z (see player.gd; the
-## bike never rotates its heading), the rider's actual left/right and
-## world -X/+X are the same thing by construction, so this can never be
-## reversed by camera angle, tilt, or steering.
+## Tap-triggered throwing (Milestone 10.2 -- replaces the earlier
+## swipe/keypress gesture entirely). A left throw always launches toward
+## world -X, a right throw toward world +X -- because Player's forward
+## is a constant world -Z (see player.gd; the bike never rotates its
+## heading), the rider's actual left/right and world -X/+X are the same
+## thing by construction, so this can never be reversed by camera angle,
+## tilt, or steering.
 ##
-## A throw only counts as a hit when the route's current active mailbox
-## is on the thrown side *and* within a forgiving along-route (Z) window
-## of the player (hit_z_tolerance) -- the player needs to be roughly at
-## the right point in the route and pick the correct side; fine lateral
-## positioning isn't required. A correct throw's newspaper flies
-## straight to that mailbox's real position (a small aiming assist);
-## anything else is a clean, deterministic miss that flies out to the
-## chosen side and lands.
+## Hit/miss is decided by RouteManager.get_valid_throw_side() -- the
+## same method TouchControls polls to decide whether a throw arrow is
+## even visible/tappable, so a tap can only ever resolve differently
+## from what the player saw if the player's position changed in the
+## single frame between the tap and this method running (a few
+## centimeters at cruise speed, negligible next to the window's size).
+## A correct throw's newspaper flies straight to that mailbox's real
+## position (a small aiming assist); anything else is a clean,
+## deterministic miss that flies out to the chosen side and lands.
 
 @export var route_manager_path: NodePath
 @export var throw_height_offset: float = 1.1
-@export var hit_z_tolerance: float = 5.0
 @export var throw_side_distance: float = 7.0
 
 const NEWSPAPER_SCENE := preload("res://scenes/world/Newspaper.tscn")
@@ -47,16 +48,13 @@ func _throw(side: int) -> void:
 	var start := _player.global_position + Vector3.UP * throw_height_offset
 	var end := start + Vector3(float(side) * throw_side_distance, 0.0, 0.0)
 	var target_mailbox := _route_manager.get_active_mailbox()
-	var hit := false
+	var hit := _route_manager.get_valid_throw_side() == side
 
-	if target_mailbox:
-		var mailbox_side := signf(target_mailbox.global_position.x)
-		var same_side := mailbox_side == 0.0 or signf(float(side)) == mailbox_side
-		var within_range := absf(target_mailbox.global_position.z - _player.global_position.z) <= hit_z_tolerance
-		hit = same_side and within_range
-		if hit:
-			end = target_mailbox.get_delivery_point() if target_mailbox.has_method("get_delivery_point") else target_mailbox.global_position
-			_route_manager.notify_hit_committed()
+	if hit and target_mailbox:
+		end = target_mailbox.get_delivery_point() if target_mailbox.has_method("get_delivery_point") else target_mailbox.global_position
+		_route_manager.notify_hit_committed()
+	else:
+		hit = false
 
 	var newspaper: Newspaper = NEWSPAPER_SCENE.instantiate()
 	_player.get_parent().add_child(newspaper)

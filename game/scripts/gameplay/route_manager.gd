@@ -48,6 +48,14 @@ signal route_started
 ## a missed/ignored mailbox can never permanently stall progress toward
 ## delivery_target.
 @export var mailbox_skip_margin: float = 6.0
+## Milestone 10.2: how close (along the route's Z axis) the player must
+## be to the active mailbox for a throw arrow on its side to appear and
+## be tappable at all. This single method (get_valid_throw_side) is the
+## only place that decides "is a delivery available right now" -- both
+## TouchControls (arrow visibility) and Thrower (what a tap actually
+## resolves to) call it, so the UI and the gameplay outcome can never
+## disagree the way a separately-reimplemented swipe hit-check once could.
+@export var delivery_window_z_tolerance: float = 5.0
 
 const FLOATING_POPUP_SCENE := preload("res://scenes/ui/FloatingPopup.tscn")
 
@@ -129,6 +137,28 @@ func consume_newspaper() -> bool:
 
 func get_active_mailbox() -> Node3D:
 	return _active_mailbox if state == State.ACTIVE else null
+
+
+## Returns -1 if a throw-left is currently deliverable, 1 if throw-right
+## is, or 0 if neither (no active mailbox, or the player isn't within
+## delivery_window_z_tolerance of it yet/anymore). This is a pure query
+## of current state -- calling it doesn't consume or commit anything, so
+## TouchControls can poll it every frame purely to decide what to show.
+func get_valid_throw_side() -> int:
+	if state != State.ACTIVE or not _active_mailbox or not _player:
+		return 0
+	if absf(_active_mailbox.global_position.z - _player.global_position.z) > delivery_window_z_tolerance:
+		return 0
+	var mailbox_side := signf(_active_mailbox.global_position.x)
+	return 1 if mailbox_side >= 0.0 else -1
+
+
+## True while at least one hit-labeled newspaper is still in flight.
+## Milestone 10.2 uses this to debounce the throw arrows (dim + ignore
+## taps) while a delivery is resolving, so a double-tap can't send a
+## second redundant newspaper at the same mailbox.
+func has_pending_hit() -> bool:
+	return _pending_hit_count > 0
 
 
 ## Called by Thrower the instant it commits to a hit (before the

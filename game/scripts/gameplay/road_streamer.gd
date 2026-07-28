@@ -40,16 +40,17 @@ extends Node3D
 @export var player_path: NodePath
 
 ## Gameplay-based pacing, not an arbitrary number: at the bike's cruise
-## speed (6.5 m/s, see player.gd's auto_cruise_speed) two blocks is
-## 48m / ~7.4s between delivery opportunities -- enough time to see the
-## mailbox appear, read which side it's on, drift the bike into
-## position, throw, and watch the result resolve (newspaper flight_duration
-## 0.5s + hit_z_tolerance's ~5m/0.8s window) before the next one is even
-## visible. Braking only ever slows the bike below cruise speed, so this
-## spacing is the worst case, never a tighter one. 1 = a mailbox on every
-## block (Milestone 10's original crowded pacing); raise for a more
-## relaxed route.
-@export var mailbox_spacing_blocks: int = 2
+## speed (6.5 m/s, see player.gd's auto_cruise_speed) four blocks is
+## 96m / ~14.8s between delivery opportunities -- squarely in Milestone
+## 10.2's target 70-100m gap, and enough time to actually ride, steer,
+## and look around between deliveries rather than immediately bracing
+## for the next one. Braking only ever slows the bike below cruise
+## speed, so this spacing is the worst case, never a tighter one.
+## History: Milestone 10 shipped 1 (a mailbox on every block -- the
+## "too crowded" complaint); Milestone 10.1 raised it to 2 (48m), which
+## real-phone testing still found too dense; this is the second, much
+## larger correction the brief explicitly asked for, not a small tweak.
+@export var mailbox_spacing_blocks: int = 4
 
 @onready var _route_manager: RouteManager = get_node_or_null(route_manager_path)
 @onready var _player: Node3D = get_node_or_null(player_path)

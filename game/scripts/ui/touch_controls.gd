@@ -1,10 +1,15 @@
 class_name TouchControls
 extends CanvasLayer
 
-## Mobile control surface (Milestone 10): three large hold buttons across
-## the bottom of the screen -- LEFT, BRAKE, RIGHT -- plus a full-screen
-## swipe layer for directional newspaper throws. There is no joystick;
-## the bike drives itself, so movement input is reduced to steer/brake.
+## Mobile control surface. Two groups, deliberately kept apart on
+## screen: three large hold buttons across the bottom -- LEFT, BRAKE,
+## RIGHT -- for riding, and two contextual one-tap arrows at the
+## vertical middle-left/middle-right edges for throwing. There is no
+## joystick (the bike drives itself) and, as of Milestone 10.2, no swipe
+## gesture either -- swipe throwing was removed completely (unreliable
+## on real phones, per player feedback) in favor of a simple tap that
+## only appears when a delivery is actually available.
+##
 ## Exposes the same query contract PlayerInput/Thrower expect
 ## (get_steer_input / is_brake_held / consume_throw_left_just_pressed /
 ## consume_throw_right_just_pressed / jump passthrough) so any future
@@ -22,11 +27,14 @@ extends CanvasLayer
 @onready var left_button: TouchButton = $LeftButton
 @onready var brake_button: TouchButton = $BrakeButton
 @onready var right_button: TouchButton = $RightButton
-@onready var swipe_gesture: SwipeThrowGesture = $SwipeThrowGesture
+@onready var throw_left_arrow: ThrowArrowButton = $ThrowLeftArrow
+@onready var throw_right_arrow: ThrowArrowButton = $ThrowRightArrow
 
 var _left_held: bool = false
 var _right_held: bool = false
 var _brake_held: bool = false
+var _throw_left_just_pressed: bool = false
+var _throw_right_just_pressed: bool = false
 var _route_manager: RouteManager
 
 
@@ -40,11 +48,28 @@ func _ready() -> void:
 	if brake_button:
 		brake_button.button_pressed.connect(func(): _brake_held = true)
 		brake_button.button_released.connect(func(): _brake_held = false)
+	if throw_left_arrow:
+		throw_left_arrow.tapped.connect(func(): _throw_left_just_pressed = true)
+	if throw_right_arrow:
+		throw_right_arrow.tapped.connect(func(): _throw_right_just_pressed = true)
 
 	_route_manager = get_node_or_null(route_manager_path)
 	if _route_manager:
 		_route_manager.state_changed.connect(_on_state_changed)
 	_set_controls_enabled(false)
+
+
+func _process(_delta: float) -> void:
+	if not _route_manager or _route_manager.state != RouteManager.State.ACTIVE:
+		return
+	var valid_side := _route_manager.get_valid_throw_side()
+	var locked := _route_manager.has_pending_hit()
+	if throw_left_arrow:
+		throw_left_arrow.set_valid(valid_side == -1)
+		throw_left_arrow.set_locked(locked)
+	if throw_right_arrow:
+		throw_right_arrow.set_valid(valid_side == 1)
+		throw_right_arrow.set_locked(locked)
 
 
 func _on_state_changed(new_state: RouteManager.State) -> void:
@@ -62,8 +87,10 @@ func _set_controls_enabled(value: bool) -> void:
 		right_button.set_enabled(value)
 	if brake_button:
 		brake_button.set_enabled(value)
-	if swipe_gesture:
-		swipe_gesture.set_enabled(value)
+	if throw_left_arrow:
+		throw_left_arrow.set_enabled(value)
+	if throw_right_arrow:
+		throw_right_arrow.set_enabled(value)
 
 
 func get_steer_input() -> float:
@@ -80,8 +107,14 @@ func is_brake_held() -> bool:
 
 
 func consume_throw_left_just_pressed() -> bool:
-	return swipe_gesture.consume_throw_left_just_pressed() if swipe_gesture else false
+	if _throw_left_just_pressed:
+		_throw_left_just_pressed = false
+		return true
+	return false
 
 
 func consume_throw_right_just_pressed() -> bool:
-	return swipe_gesture.consume_throw_right_just_pressed() if swipe_gesture else false
+	if _throw_right_just_pressed:
+		_throw_right_just_pressed = false
+		return true
+	return false

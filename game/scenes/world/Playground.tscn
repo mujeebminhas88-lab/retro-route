@@ -182,7 +182,6 @@ boost_speed_multiplier = 1.0
 script = ExtResource("7_1in58")
 route_manager_path = NodePath("%RouteManager")
 throw_height_offset = 1.1
-hit_z_tolerance = 5.0
 throw_side_distance = 7.0
 
 [node name="CameraRig" type="Node3D" parent="." instance=ExtResource("8_o5vik")]

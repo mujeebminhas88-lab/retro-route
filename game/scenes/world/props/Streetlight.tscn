@@ -21,6 +21,8 @@ height = 0.4
 [node name="Streetlight" type="Node3D"]
 
 [node name="Body" type="StaticBody3D" parent="."]
+collision_layer = 2
+collision_mask = 0
 
 [node name="Pole" type="MeshInstance3D" parent="Body"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, 0)

@@ -25,6 +25,18 @@ albedo_color = Color(0.55, 0.55, 0.55, 1)
 [sub_resource type="BoxMesh" id="BoxMesh_x306m"]
 size = Vector3(0.04, 0.22, 0.1)
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slot"]
+albedo_color = Color(0.05, 0.05, 0.06, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_slot"]
+size = Vector3(0.28, 0.16, 0.02)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flap"]
+albedo_color = Color(0.15, 0.35, 0.55, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_flap"]
+size = Vector3(0.26, 0.15, 0.02)
+
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_4j625"]
 transparency = 1
 shading_mode = 0
@@ -59,6 +71,8 @@ scale_max = 1.4
 size = Vector2(0.1, 0.1)
 
 [node name="Mailbox" type="StaticBody3D"]
+collision_layer = 2
+collision_mask = 0
 script = ExtResource("1_1ecf2")
 active_bob_speed = 3.0
 active_bob_height = 0.08
@@ -89,8 +103,21 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.25, 0.95, 0)
 material_override = SubResource("StandardMaterial3D_ry06i")
 mesh = SubResource("BoxMesh_x306m")
 
+[node name="Slot" type="MeshInstance3D" parent="VisualRoot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, -0.176)
+material_override = SubResource("StandardMaterial3D_slot")
+mesh = SubResource("BoxMesh_slot")
+
+[node name="FlapPivot" type="Node3D" parent="VisualRoot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.93, -0.176)
+
+[node name="Flap" type="MeshInstance3D" parent="VisualRoot/FlapPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.075, 0)
+material_override = SubResource("StandardMaterial3D_flap")
+mesh = SubResource("BoxMesh_flap")
+
 [node name="DeliveryPoint" type="Marker3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, -0.09)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, -0.19)
 
 [node name="TargetRing" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 0.03, 0)

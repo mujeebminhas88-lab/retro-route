@@ -2,19 +2,10 @@
 
 [ext_resource type="Script" path="res://scripts/ui/touch_controls.gd" id="1_jmbax"]
 [ext_resource type="Script" path="res://scripts/ui/touch_button.gd" id="2_tbtn"]
-[ext_resource type="Script" path="res://scripts/ui/swipe_throw_gesture.gd" id="3_swipe"]
+[ext_resource type="Script" path="res://scripts/ui/throw_arrow_button.gd" id="3_arrow"]
 
 [node name="TouchControls" type="CanvasLayer"]
 script = ExtResource("1_jmbax")
-
-[node name="SwipeThrowGesture" type="Control" parent="."]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-script = ExtResource("3_swipe")
 
 [node name="LeftButton" type="Control" parent="."]
 layout_mode = 3
@@ -61,3 +52,29 @@ script = ExtResource("2_tbtn")
 label_text = "RIGHT"
 base_color = Color(1, 1, 1, 0.22)
 pressed_color = Color(1, 1, 1, 0.45)
+
+[node name="ThrowLeftArrow" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 20.0
+offset_top = -75.0
+offset_right = 170.0
+offset_bottom = 75.0
+script = ExtResource("3_arrow")
+side = -1
+
+[node name="ThrowRightArrow" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -170.0
+offset_top = -75.0
+offset_right = -20.0
+offset_bottom = 75.0
+script = ExtResource("3_arrow")
+side = 1

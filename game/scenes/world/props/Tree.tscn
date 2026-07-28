@@ -21,6 +21,8 @@ height = 2.0
 [node name="Tree" type="Node3D"]
 
 [node name="Body" type="StaticBody3D" parent="."]
+collision_layer = 2
+collision_mask = 0
 
 [node name="Trunk" type="MeshInstance3D" parent="Body"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)

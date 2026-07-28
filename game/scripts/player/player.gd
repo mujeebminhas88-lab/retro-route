@@ -1,36 +1,44 @@
 class_name Player
 extends CharacterBody3D
 
-## Arcade BMX locomotion controller. Vehicle-style controls: steering
-## turns the bike, forward/back is throttle/brake. This is not a bicycle
-## simulation — no wheel colliders, no suspension, no balancing — it is
-## tuned purely for immediate, responsive, Paperboy-style fun.
+## Arcade auto-runner BMX controller (Milestone 10 redesign). The bike
+## always travels forward along world -Z at an automatic cruise speed --
+## there is no manual throttle and no heading rotation from steering.
+## LEFT/RIGHT input is a smoothed *lateral* velocity (a strafe across the
+## road), not a turn, so the bike can never spin, oversteer, or reverse
+## its facing. This is a deliberate departure from the earlier
+## heading-based BMX steering: that model made "swerve too much" and
+## "which way is the bike even facing" real problems once the player
+## stopped manually driving. A constant forward axis also means the
+## rider's left/right and world -X/+X are identical by construction, so
+## Thrower's throw-left/throw-right can never be reversed by camera
+## angle, tilt, or steering -- there is nothing to reverse it.
 ##
-## Facing is still driven by a smoothed scalar `rotation.y` on VisualRoot
-## (never by direct basis reassignment), so it never fights with
-## VisualRoot's independently-animated squash/stretch `scale`, and so
-## Camera/Thrower's read of `visual_root.global_transform.basis.z` keeps
-## working unchanged. Lean/pitch visual polish is applied to a separate
-## LeanPivot child instead of VisualRoot itself, so it can never corrupt
-## that facing vector.
+## A small cosmetic yaw/lean still plays on steering input for feel, but
+## it never drives movement -- VisualRoot's rotation is purely
+## decorative here, unlike the old model where it was the whole steering
+## mechanism.
 
 enum LocomotionState { GROUNDED, AIRBORNE }
 
-@export_group("BMX Movement")
-@export var top_speed: float = 7.5
-@export_range(0.0, 1.0) var reverse_speed_ratio: float = 0.5
-@export var acceleration: float = 10.0
-@export var braking: float = 16.0
-@export var steering_sensitivity: float = 1.6
-@export var turning_radius: float = 2.5
-@export var min_turn_speed: float = 2.0
-@export var steering_input_smoothing: float = 14.0
-@export_range(0.0, 1.0) var cornering_speed_loss: float = 0.15
+@export_group("Auto-Run")
+@export var auto_cruise_speed: float = 6.5
+@export var speed_response: float = 6.0
+@export var brake_speed: float = 2.0
+@export var brake_response: float = 10.0
+
+@export_group("Lateral Steering")
+@export var max_lateral_speed: float = 4.5
+@export var steering_response: float = 9.0
+@export var steering_return_response: float = 7.0
+@export var high_speed_steering_reduction: float = 0.55
+@export var lateral_bounds: float = 6.2
+@export var lateral_correction_strength: float = 10.0
+@export var lateral_correction_margin: float = 0.6
 
 @export_group("Visual Feel")
-@export var lean_angle_max_degrees: float = 18.0
-@export var pitch_angle_max_degrees: float = 6.0
-@export var brake_dive_extra_degrees: float = 5.0
+@export var cosmetic_lean_max_degrees: float = 14.0
+@export var cosmetic_pitch_max_degrees: float = 5.0
 @export var lean_response: float = 10.0
 @export var wheel_spin_rate: float = 2.5
 
@@ -53,22 +61,29 @@ enum LocomotionState { GROUNDED, AIRBORNE }
 @export_group("Wiring")
 @export var camera_rig_path: NodePath
 @export var touch_controls_path: NodePath
+@export var route_manager_path: NodePath
+
+@export_group("Boost Hook")
+## Multiplies auto_cruise_speed while a future boost is active. Nothing
+## in this milestone sets this above 1.0 -- it exists purely so a later
+## boost feature can plug in without touching the movement math again.
+@export var boost_speed_multiplier: float = 1.0
 
 signal jumped
 signal landed(fall_speed: float)
 signal state_changed(new_state: LocomotionState)
 
 var state: LocomotionState = LocomotionState.AIRBORNE
+var is_boosting: bool = false
 
 var _rise_gravity: float
 var _fall_gravity: float
 var _jump_velocity: float
 var _was_on_floor: bool = false
-var _facing_yaw: float = 0.0
-var _speed: float = 0.0
+var _forward_speed: float = 0.0
+var _lateral_speed: float = 0.0
 var _current_roll: float = 0.0
 var _current_pitch: float = 0.0
-var _smoothed_steering: float = 0.0
 var _is_braking: bool = false
 var _bounce_phase: float = 0.0
 var _landing_compress: float = 0.0
@@ -83,6 +98,7 @@ var _suspension_offset: float = 0.0
 @onready var landing_audio: AudioStreamPlayer3D = get_node_or_null("LandingAudio")
 @onready var camera_rig: Node3D = get_node_or_null(camera_rig_path)
 @onready var touch_controls: Node = get_node_or_null(touch_controls_path)
+@onready var _route_manager: RouteManager = get_node_or_null(route_manager_path)
 
 
 func _ready() -> void:
@@ -90,76 +106,75 @@ func _ready() -> void:
 	_fall_gravity = (2.0 * jump_height) / (jump_time_to_descend * jump_time_to_descend)
 	_jump_velocity = _rise_gravity * jump_time_to_peak
 	_was_on_floor = is_on_floor()
-	_facing_yaw = visual_root.rotation.y
 	if ride_audio:
 		ride_audio.volume_db = -80.0
 		ride_audio.play()
 
 
 func _physics_process(delta: float) -> void:
-	var move_input := PlayerInput.get_move_vector(touch_controls)
-	var throttle_input := -move_input.y
-	var steering_input := move_input.x
-	_smoothed_steering = lerpf(_smoothed_steering, steering_input, 1.0 - exp(-steering_input_smoothing * delta))
+	var route_active := _route_manager != null and _route_manager.state == RouteManager.State.ACTIVE
 
-	_update_speed(throttle_input, delta)
-	_update_steering(_smoothed_steering, delta)
-	_apply_cornering_drag(_smoothed_steering, delta)
+	if route_active:
+		var steering_input := PlayerInput.get_steer_input(touch_controls)
+		var braking := PlayerInput.get_brake_held(touch_controls)
+		_update_forward_speed(braking, delta)
+		_update_lateral_speed(steering_input, delta)
+	else:
+		# No movement at all before GO (idle/countdown) or once the route
+		# is complete -- there is nothing ahead to ride into.
+		_forward_speed = 0.0
+		_lateral_speed = 0.0
+		_is_braking = false
 
-	var forward := -visual_root.global_transform.basis.z
-	velocity.x = forward.x * _speed
-	velocity.z = forward.z * _speed
+	velocity.x = _lateral_speed
+	velocity.z = -_forward_speed
 
 	var velocity_y_before_move := velocity.y
 	_apply_gravity(delta)
 	_handle_jump()
 
 	move_and_slide()
+	_apply_lateral_bounds()
 
 	var grounded := is_on_floor()
 	_update_landing(velocity_y_before_move)
 	_update_state(grounded)
 	_update_visual_effects(grounded)
-	_update_lean(_smoothed_steering, delta)
-	_update_pitch(delta)
+	_update_cosmetic_lean(delta)
 	_update_suspension(grounded, delta)
 	_update_wheel_spin(delta)
 	_update_ride_audio(grounded, delta)
 
 
-func _update_speed(throttle_input: float, delta: float) -> void:
-	var target_speed := top_speed * throttle_input if throttle_input >= 0.0 else top_speed * reverse_speed_ratio * throttle_input
-	var speeding_up := absf(target_speed) > absf(_speed) + 0.001
-	var same_direction := (target_speed >= 0.0 and _speed >= -0.01) or (target_speed <= 0.0 and _speed <= 0.01)
-	_is_braking = not (speeding_up and same_direction)
-	var rate := acceleration if (speeding_up and same_direction) else braking
-	_speed = move_toward(_speed, target_speed, rate * delta)
+func _update_forward_speed(braking: bool, delta: float) -> void:
+	_is_braking = braking
+	var target := brake_speed if braking else auto_cruise_speed * boost_speed_multiplier
+	var response := brake_response if braking else speed_response
+	_forward_speed = lerpf(_forward_speed, target, 1.0 - exp(-response * delta))
 
 
-func _update_steering(steering_input: float, delta: float) -> void:
-	# Steering is proportional to current speed (like a real bike, you can't
-	# pivot sharply at a standstill) but floored by min_turn_speed so a light
-	# tap of throttle still lets the bike turn in place instead of feeling stuck.
-	if absf(steering_input) < 0.001 or absf(_speed) < 0.001:
-		return
-	var effective_speed := maxf(absf(_speed), min_turn_speed)
-	var turn_sign := signf(_speed)
-	# Negative sign: rotation.y decreases to turn the bike's forward vector
-	# toward +X (screen-right), matching Basis.looking_at's convention (and
-	# the pre-BMX locomotion's), so steering right actually turns right.
-	var angular_velocity := -(effective_speed / turning_radius) * steering_sensitivity * steering_input * turn_sign
-	_facing_yaw += angular_velocity * delta
-	visual_root.rotation.y = _facing_yaw
+func _update_lateral_speed(steering_input: float, delta: float) -> void:
+	# Steering authority shrinks as forward speed approaches cruise (and
+	# opens back up under braking) -- "limit excessive steering at high
+	# speed" from the design brief, expressed directly rather than as a
+	# side effect of some other formula.
+	var speed_ratio := clampf(_forward_speed / maxf(auto_cruise_speed, 0.01), 0.0, 1.0)
+	var authority := lerpf(1.0, high_speed_steering_reduction, speed_ratio)
+	var target := steering_input * max_lateral_speed * authority
+	var response := steering_response if absf(steering_input) > 0.001 else steering_return_response
+	_lateral_speed = lerpf(_lateral_speed, target, 1.0 - exp(-response * delta))
 
 
-func _apply_cornering_drag(steering_input: float, delta: float) -> void:
-	# A light, purely cosmetic speed bleed while cornering hard at speed —
-	# not real tire friction, just enough weight to make corners feel like
-	# they cost something without punishing the player or fighting control.
-	if cornering_speed_loss <= 0.0:
-		return
-	var drag := absf(steering_input) * cornering_speed_loss * absf(_speed)
-	_speed = move_toward(_speed, 0.0, drag * delta)
+func _apply_lateral_bounds() -> void:
+	# A soft push back toward the road before the hard bound, then a hard
+	# clamp -- the player can never ride off the playable corridor, but
+	# it reads as a gentle correction rather than hitting an invisible wall.
+	var edge := lateral_bounds - lateral_correction_margin
+	if absf(position.x) > edge:
+		var over := absf(position.x) - edge
+		var push := -signf(position.x) * lateral_correction_strength * over
+		velocity.x += push * get_physics_process_delta_time()
+	position.x = clampf(position.x, -lateral_bounds, lateral_bounds)
 
 
 func _apply_gravity(delta: float) -> void:
@@ -186,9 +201,6 @@ func _update_landing(velocity_y_before_move: float) -> void:
 	if grounded and not _was_on_floor:
 		var fall_speed := absf(velocity_y_before_move)
 		landed.emit(fall_speed)
-		# Every landing gets a small suspension compression regardless of
-		# fall speed (constant motion, feels alive); only a hard enough
-		# landing also triggers the bigger squash/dust/sound punctuation.
 		_landing_compress = -suspension_landing_compress
 		if fall_speed >= landing_velocity_threshold:
 			if visual_root and visual_root.has_method("play_landing_feedback"):
@@ -210,27 +222,21 @@ func _update_state(grounded: bool) -> void:
 
 func _update_visual_effects(grounded: bool) -> void:
 	if dust_emitter and dust_emitter.has_method("set_dust_emitting"):
-		dust_emitter.set_dust_emitting(grounded and absf(_speed) > top_speed * 0.15)
+		dust_emitter.set_dust_emitting(grounded and _forward_speed > auto_cruise_speed * 0.15)
 
 
-func _update_lean(steering_input: float, delta: float) -> void:
+func _update_cosmetic_lean(delta: float) -> void:
 	if not lean_pivot:
 		return
-	var speed_ratio := clampf(absf(_speed) / top_speed, 0.0, 1.0)
-	var target_roll := -steering_input * deg_to_rad(lean_angle_max_degrees) * speed_ratio
+	# Purely decorative -- driven by lateral speed, but never fed back
+	# into velocity/heading, so it can't affect throw direction or
+	# movement stability no matter how it's tuned.
+	var lean_ratio := clampf(_lateral_speed / maxf(max_lateral_speed, 0.01), -1.0, 1.0)
+	var target_roll := -lean_ratio * deg_to_rad(cosmetic_lean_max_degrees)
 	_current_roll = lerpf(_current_roll, target_roll, 1.0 - exp(-lean_response * delta))
 	lean_pivot.rotation.z = _current_roll
 
-
-func _update_pitch(delta: float) -> void:
-	if not lean_pivot:
-		return
-	var speed_ratio := clampf(_speed / top_speed, -1.0, 1.0)
-	var target_pitch := -deg_to_rad(pitch_angle_max_degrees) * speed_ratio
-	if _is_braking:
-		# Nose dips under braking — the arcade "brake dive," independent of
-		# the accel/decel lean above so it reads clearly as its own event.
-		target_pitch += deg_to_rad(brake_dive_extra_degrees) * clampf(absf(_speed) / top_speed, 0.0, 1.0)
+	var target_pitch := deg_to_rad(cosmetic_pitch_max_degrees) if _is_braking else 0.0
 	_current_pitch = lerpf(_current_pitch, target_pitch, 1.0 - exp(-lean_response * delta))
 	lean_pivot.rotation.x = _current_pitch
 
@@ -238,13 +244,10 @@ func _update_pitch(delta: float) -> void:
 func _update_suspension(grounded: bool, delta: float) -> void:
 	if not lean_pivot:
 		return
-	# Continuous subtle bounce while rolling (purely cosmetic — never
-	# affects the collision body), plus a landing compression that decays
-	# back out. Both are cheap per-frame math, no allocations or tweens.
 	var ride_bounce := 0.0
-	if grounded and absf(_speed) > 0.01:
+	if grounded and _forward_speed > 0.01:
 		_bounce_phase += suspension_bounce_frequency * delta
-		var speed_ratio := clampf(absf(_speed) / top_speed, 0.0, 1.0)
+		var speed_ratio := clampf(_forward_speed / auto_cruise_speed, 0.0, 1.0)
 		ride_bounce = sin(_bounce_phase) * suspension_bounce_amount * speed_ratio
 	_landing_compress = lerpf(_landing_compress, 0.0, 1.0 - exp(-suspension_response * delta))
 	_suspension_offset = ride_bounce + _landing_compress
@@ -254,7 +257,7 @@ func _update_suspension(grounded: bool, delta: float) -> void:
 func _update_wheel_spin(delta: float) -> void:
 	if wheel_pivots.is_empty():
 		return
-	var spin := wheel_spin_rate * _speed * delta
+	var spin := wheel_spin_rate * _forward_speed * delta
 	for wheel_pivot in wheel_pivots:
 		if wheel_pivot:
 			wheel_pivot.rotation.x -= spin
@@ -263,7 +266,7 @@ func _update_wheel_spin(delta: float) -> void:
 func _update_ride_audio(grounded: bool, delta: float) -> void:
 	if not ride_audio:
 		return
-	var speed_ratio := clampf(absf(_speed) / top_speed, 0.0, 1.0)
+	var speed_ratio := clampf(_forward_speed / auto_cruise_speed, 0.0, 1.0)
 	var target_db := linear_to_db(0.05 + 0.35 * speed_ratio) if grounded and speed_ratio > 0.02 else -80.0
 	ride_audio.volume_db = lerpf(ride_audio.volume_db, target_db, 1.0 - exp(-6.0 * delta))
 	ride_audio.pitch_scale = 0.85 + 0.3 * speed_ratio

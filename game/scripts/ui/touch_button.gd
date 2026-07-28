@@ -16,13 +16,31 @@ const MOUSE_POINTER_INDEX := -2
 
 var _active_pointer_index: int = -1
 var _is_pressed: bool = false
+var _enabled: bool = true
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
+## Disabling both hides the button and stops it from claiming input, so
+## it can never sit on top of (and eat clicks meant for) an unrelated
+## button occupying the same screen space in a different route state --
+## e.g. this control surface's own BRAKE button versus the route intro's
+## START ROUTE button, both bottom-center by design.
+func set_enabled(value: bool) -> void:
+	if value == _enabled:
+		return
+	_enabled = value
+	visible = value
+	if not value and _active_pointer_index != -1:
+		_active_pointer_index = -1
+		_set_pressed(false)
+
+
 func _input(event: InputEvent) -> void:
+	if not _enabled:
+		return
 	if event is InputEventScreenTouch:
 		_handle_pointer(event.index, event.position, event.pressed)
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
